@@ -1,0 +1,90 @@
+min_version = "2025.8.0"
+# Swift comes from Xcode Command Line Tools / PATH (mise swift@5.10 is incompatible with this macOS SDK).
+
+[env]
+_.path = [".build/release", ".build/debug"]
+
+[tasks.resolve]
+description = "Resolve Swift package dependencies"
+run = "swift package resolve"
+alias = "deps"
+
+[tasks.build-debug]
+description = "Debug build of aviary"
+run = """
+swift build --product aviary
+BIN="$(swift build --product aviary --show-bin-path)/aviary"
+mkdir -p .build/debug
+[ "$BIN" -ef .build/debug/aviary ] || cp -f "$BIN" .build/debug/aviary
+"""
+sources = ["Package.swift", "Sources/**/*.swift", "Sources/**/*.json"]
+outputs = [".build/debug/aviary"]
+alias = "d"
+
+[tasks.build]
+description = "Release build of aviary"
+run = """
+swift build -c release --product aviary
+BIN="$(swift build -c release --product aviary --show-bin-path)/aviary"
+mkdir -p .build/release
+[ "$BIN" -ef .build/release/aviary ] || cp -f "$BIN" .build/release/aviary
+"""
+sources = ["Package.swift", "Sources/**/*.swift", "Sources/**/*.json"]
+outputs = [".build/release/aviary"]
+alias = "b"
+
+[tasks.test]
+description = "Run unit tests"
+run = """
+swift build --product AviarySelfTest
+BIN="$(swift build --product AviarySelfTest --show-bin-path)/AviarySelfTest"
+"$BIN"
+"""
+alias = "t"
+
+[tasks.test-filter]
+description = "Run tests matching a XCTest/Swift Testing filter"
+usage = """
+arg "<filter>" help="Test name filter passed to swift test --filter"
+"""
+run = """
+swift build --product AviarySelfTest
+BIN="$(swift build --product AviarySelfTest --show-bin-path)/AviarySelfTest"
+"$BIN"
+"""
+
+[tasks.run]
+description = "Debug-build then run aviary with extra args (from caller cwd)"
+depends = ["build-debug"]
+dir = "{{cwd}}"
+usage = """
+arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
+"""
+run = '"$MISE_PROJECT_ROOT/.build/debug/aviary" ${usage_cli_args-}'
+
+[tasks.aviary]
+description = "Release-build then run aviary with extra args"
+depends = ["build"]
+dir = "{{cwd}}"
+usage = """
+arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
+"""
+run = '"$MISE_PROJECT_ROOT/.build/release/aviary" ${usage_cli_args-}'
+
+[tasks.install]
+description = "Install release binary to ~/.local/bin/aviary"
+depends = ["build"]
+run = 'mkdir -p "${MISE_INSTALL_PATH:-$HOME/.local/bin}" && cp -f "$MISE_PROJECT_ROOT/.build/release/aviary" "${MISE_INSTALL_PATH:-$HOME/.local/bin}/aviary"'
+
+[tasks.clean]
+description = "Remove Swift build artifacts"
+run = "swift package clean"
+
+[tasks.ci]
+description = "Test then release-build"
+depends = ["test", "build"]
+
+[tasks.watch]
+description = "Rebuild debug binary on source changes"
+run = "mise watch build-debug"
+hide = true

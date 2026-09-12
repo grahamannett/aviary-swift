@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:aviary}",
+            "name": "Debug aviary",
+            "target": "aviary",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug aviary"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:aviary}",
+            "name": "Release aviary",
+            "target": "aviary",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release aviary"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:aviary}",
+            "name": "Debug AviarySelfTest",
+            "target": "AviarySelfTest",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug AviarySelfTest"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:aviary}",
+            "name": "Release AviarySelfTest",
+            "target": "AviarySelfTest",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release AviarySelfTest"
+        }
+    ]
+}
