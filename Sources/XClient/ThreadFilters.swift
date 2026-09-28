@@ -2,11 +2,11 @@ import Foundation
 
 public func filterAuthorChain(tweets: [TweetData], bookmarkedTweet: TweetData) -> [TweetData] {
     let author = bookmarkedTweet.author.username
-    var byId = Dictionary(uniqueKeysWithValues: tweets.map { ($0.id, $0) })
+    let byId = Dictionary(tweets.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
     var chainIds = Set<String>()
     var current: TweetData? = bookmarkedTweet
     while let cur = current, cur.author.username == author {
-        chainIds.insert(cur.id)
+        guard chainIds.insert(cur.id).inserted else { break }
         guard let parentId = cur.inReplyToStatusId else { break }
         guard let parent = byId[parentId], parent.author.username == author else { break }
         current = parent
@@ -23,7 +23,7 @@ public func filterAuthorChain(tweets: [TweetData], bookmarkedTweet: TweetData) -
             }
         }
     }
-    return tweets.filter { chainIds.contains($0.id) }.sorted(by: createdAtAsc)
+    return tweets.filter { chainIds.contains($0.id) }.sorted(by: tweetCreatedAtAsc)
 }
 
 public func filterAuthorOnly(tweets: [TweetData], bookmarkedTweet: TweetData) -> [TweetData] {
@@ -31,7 +31,7 @@ public func filterAuthorOnly(tweets: [TweetData], bookmarkedTweet: TweetData) ->
 }
 
 public func filterFullChain(tweets: [TweetData], bookmarkedTweet: TweetData, includeAncestorBranches: Bool = false) -> [TweetData] {
-    let byId = Dictionary(uniqueKeysWithValues: tweets.map { ($0.id, $0) })
+    let byId = Dictionary(tweets.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
     var repliesByParent: [String: [TweetData]] = [:]
     for tweet in tweets {
         if let p = tweet.inReplyToStatusId {
@@ -42,16 +42,16 @@ public func filterFullChain(tweets: [TweetData], bookmarkedTweet: TweetData, inc
     var ancestorIds: [String] = []
     var current: TweetData? = bookmarkedTweet
     while let parentId = current?.inReplyToStatusId, let parent = byId[parentId] {
-        if !chainIds.contains(parent.id) {
-            chainIds.insert(parent.id)
-            ancestorIds.append(parent.id)
-        }
+        guard chainIds.insert(parent.id).inserted else { break }
+        ancestorIds.append(parent.id)
         current = parent
     }
     func addDescendants(_ start: [String]) {
         var queue = start
-        while !queue.isEmpty {
-            let currentId = queue.removeFirst()
+        var index = 0
+        while index < queue.count {
+            let currentId = queue[index]
+            index += 1
             chainIds.insert(currentId)
             for reply in repliesByParent[currentId] ?? [] {
                 if chainIds.contains(reply.id) { continue }
@@ -64,10 +64,10 @@ public func filterFullChain(tweets: [TweetData], bookmarkedTweet: TweetData, inc
     if includeAncestorBranches {
         for id in ancestorIds { addDescendants([id]) }
     }
-    return tweets.filter { chainIds.contains($0.id) }.sorted(by: createdAtAsc)
+    return tweets.filter { chainIds.contains($0.id) }.sorted(by: tweetCreatedAtAsc)
 }
 
-public struct ThreadMetadata {
+public struct ThreadMetadata: Codable, Sendable {
     public var isThread: Bool
     public var threadPosition: String
     public var hasSelfReplies: Bool
@@ -79,7 +79,7 @@ public func addThreadMetadata(tweet: TweetData, allConversationTweets: [TweetDat
     let hasSelfReplies = allConversationTweets.contains {
         $0.inReplyToStatusId == tweet.id && $0.author.username == author
     }
-    let isRoot = tweet.inReplyToStatusId == nil
+    let isRoot = tweet.inReplyToStatusId?.isEmpty != false
     let position: String
     if isRoot && !hasSelfReplies { position = "standalone" }
     else if isRoot && hasSelfReplies { position = "root" }
@@ -93,13 +93,17 @@ public func addThreadMetadata(tweet: TweetData, allConversationTweets: [TweetDat
     )
 }
 
-private func createdAtAsc(_ a: TweetData, _ b: TweetData) -> Bool {
-    return tweetTime(a.createdAt) < tweetTime(b.createdAt)
+public func tweetCreatedAtAsc(_ a: TweetData, _ b: TweetData) -> Bool {
+    return tweetTimestamp(a.createdAt) < tweetTimestamp(b.createdAt)
 }
 
-private func tweetTime(_ value: String?) -> Double {
+public func tweetTimestamp(_ value: String?) -> Double {
     guard let value else { return 0 }
-    if let d = ISO8601DateFormatter().date(from: value) { return d.timeIntervalSince1970 }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let d = iso.date(from: value) { return d.timeIntervalSince1970 }
+    iso.formatOptions = [.withInternetDateTime]
+    if let d = iso.date(from: value) { return d.timeIntervalSince1970 }
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
     f.dateFormat = "EEE MMM dd HH:mm:ss Z yyyy"

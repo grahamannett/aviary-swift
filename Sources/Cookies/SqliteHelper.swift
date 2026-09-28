@@ -6,28 +6,35 @@ enum SqliteHelper {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("aviary-cookies-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let dest = tmp.appendingPathComponent("Cookies")
-        try FileManager.default.copyItem(atPath: dbPath, toPath: dest.path)
-        for suffix in ["-wal", "-shm"] {
-            let side = dbPath + suffix
-            if FileManager.default.fileExists(atPath: side) {
-                try? FileManager.default.copyItem(atPath: side, toPath: dest.path + suffix)
+        do {
+            try FileManager.default.copyItem(atPath: dbPath, toPath: dest.path)
+            for suffix in ["-wal", "-shm"] {
+                let side = dbPath + suffix
+                if FileManager.default.fileExists(atPath: side) {
+                    try? FileManager.default.copyItem(atPath: side, toPath: dest.path + suffix)
+                }
             }
+        } catch {
+            try? FileManager.default.removeItem(at: tmp)
+            throw error
         }
         return dest
     }
 
-    static func query(_ dbPath: String, sql: String) -> [[String: Any]] {
+    static func query(_ dbPath: String, sql: String) throws -> [[String: Any]] {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            let error = databaseError(db)
             sqlite3_close(db)
-            return []
+            throw error
         }
         defer { sqlite3_close(db) }
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { throw databaseError(db) }
         defer { sqlite3_finalize(stmt) }
         var rows: [[String: Any]] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var step = sqlite3_step(stmt)
+        while step == SQLITE_ROW {
             var row: [String: Any] = [:]
             let cols = sqlite3_column_count(stmt)
             for i in 0 ..< cols {
@@ -53,7 +60,14 @@ enum SqliteHelper {
                 }
             }
             rows.append(row)
+            step = sqlite3_step(stmt)
         }
+        guard step == SQLITE_DONE else { throw databaseError(db) }
         return rows
+    }
+
+    private static func databaseError(_ db: OpaquePointer?) -> NSError {
+        let message = sqlite3_errmsg(db).map { String(cString: $0) } ?? "Unable to open cookie database"
+        return NSError(domain: "sqlite", code: Int(sqlite3_errcode(db)), userInfo: [NSLocalizedDescriptionKey: message])
     }
 }

@@ -1,6 +1,6 @@
 # aviary-swift
 
-Swift rewrite of Bird 0.8 as a native macOS CLI named `aviary`. Same commands, flags, cookie auth (`auth_token` / `ct0`), GraphQL/REST, and config paths (`~/.config/bird`, `./.birdrc.json5`). Browser cookie decrypt is implemented in Swift (Safari binarycookies, Chrome sqlite + Keychain, Firefox sqlite). No Node/Bun at runtime.
+A macOS CLI for reading and posting on X, written in Swift. Aims to match Bird 0.8's commands and output. No Node.js or Bun required.
 
 ## Requirements
 
@@ -11,23 +11,24 @@ Swift rewrite of Bird 0.8 as a native macOS CLI named `aviary`. Same commands, f
 ## Build and run
 
 ```bash
-cd aviary-swift
 mise run test
 mise run build
 mise run aviary -- --help
 mise run aviary -- --cookie-source chrome whoami
 ```
 
-The binary is copied to `.build/release/aviary`.
+The binary is at `.build/release/aviary`. Tests run offline with fixtures; they don't access your browser cookies or X account.
+
+## Authentication and config
+
+Aviary reads login cookies from Safari, Chrome, or Firefox. Use `--cookie-source` to choose a browser, or pass `--auth-token` and `--ct0` directly. Safari may require Full Disk Access for your terminal.
+
+Reads Bird config from `~/.config/bird/config.json5` and `./.birdrc.json5`. Caches are separate, under `$XDG_CONFIG_HOME/aviary` or `~/.config/aviary`.
+
+See [Bird compatibility](docs/bird-compatibility.md) for command coverage and differences. For scripts: `read --json` returns one object, not an array; paginated results include `nextCursor`.
 
 ## Homebrew (local formula)
 
 ```bash
 brew install --build-from-source Formula/aviary.rb
 ```
-
-## Notes
-
-- Executable name is `aviary`, not `bird`.
-- Cookie extraction is macOS-only in this tree.
-- Safari may need Full Disk Access for Terminal (or the app that launches `aviary`).

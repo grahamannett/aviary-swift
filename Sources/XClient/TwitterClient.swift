@@ -1,652 +1,323 @@
 import Cookies
 import Foundation
 
+struct GraphResponse {
+    var json: [String: Any]?
+    var status = 0
+    var error: String?
+    var needsRefresh = false
+    var success: Bool { json != nil && error == nil }
+}
+
 public actor TwitterClient {
     public let authToken: String
     public let ct0: String
     public let cookieHeader: String
-    public let timeoutMs: Int?
+    public let timeoutMs: Double?
     public let quoteDepth: Int
     public var session: HTTPSession
-    private let clientUuid = UUID().uuidString
-    private let clientDeviceId = UUID().uuidString
-    private var clientUserId: String?
+    let queryIdStore: QueryIdStore
+    let sleepMilliseconds: @Sendable (Int) async throws -> Void
+    let resolveUserBeforeMutation: Bool
+    let clientUuid = UUID().uuidString
+    let clientDeviceId = UUID().uuidString
+    var clientUserId: String?
 
-    public static let bearer =
-        "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
+    public static let bearer = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
     public static let graphqlBase = "https://x.com/i/api/graphql"
 
-    public init(cookies: TwitterCookies, timeoutMs: Int? = nil, quoteDepth: Int = 1, session: HTTPSession = URLSessionHTTP()) {
-        guard let auth = cookies.authToken, let ct0 = cookies.ct0 else {
-            fatalError("Both authToken and ct0 cookies are required")
-        }
-        self.authToken = auth
-        self.ct0 = ct0
-        self.cookieHeader = cookies.cookieHeader ?? "auth_token=\(auth); ct0=\(ct0)"
+    public init(cookies: TwitterCookies, timeoutMs: Double? = nil, quoteDepth: Int = 1,
+                session: HTTPSession = URLSessionHTTP(), queryIdStore: QueryIdStore = .shared,
+                resolveUserBeforeMutation: Bool = true,
+                sleepMilliseconds: @escaping @Sendable (Int) async throws -> Void = { ms in
+                    if ms > 0 { try await Task.sleep(for: .milliseconds(ms)) }
+                }) {
+        self.authToken = cookies.authToken ?? ""
+        self.ct0 = cookies.ct0 ?? ""
+        self.cookieHeader = cookies.cookieHeader ?? "auth_token=\(cookies.authToken ?? ""); ct0=\(cookies.ct0 ?? "")"
         self.timeoutMs = timeoutMs
         self.quoteDepth = max(0, quoteDepth)
         self.session = session
+        self.queryIdStore = queryIdStore
+        self.resolveUserBeforeMutation = resolveUserBeforeMutation
+        self.sleepMilliseconds = sleepMilliseconds
     }
 
-    public func setSession(_ session: HTTPSession) {
-        self.session = session
-    }
-
-    private func transactionId() -> String {
-        var bytes = [UInt8](repeating: 0, count: 16)
-        for i in 0..<16 { bytes[i] = UInt8.random(in: 0...255) }
-        return bytes.map { String(format: "%02x", $0) }.joined()
-    }
+    public func setSession(_ session: HTTPSession) { self.session = session }
 
     public func baseHeaders() -> [String: String] {
-        var headers: [String: String] = [
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "authorization": "Bearer \(Self.bearer)",
-            "x-csrf-token": ct0,
-            "x-twitter-auth-type": "OAuth2Session",
-            "x-twitter-active-user": "yes",
-            "x-twitter-client-language": "en",
-            "x-client-uuid": clientUuid,
+        var headers = [
+            "accept": "*/*", "accept-language": "en-US,en;q=0.9",
+            "authorization": "Bearer \(Self.bearer)", "x-csrf-token": ct0,
+            "x-twitter-auth-type": "OAuth2Session", "x-twitter-active-user": "yes",
+            "x-twitter-client-language": "en", "x-client-uuid": clientUuid,
             "x-twitter-client-deviceid": clientDeviceId,
-            "x-client-transaction-id": transactionId(),
+            "x-client-transaction-id": (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined(),
             "cookie": cookieHeader,
-            "user-agent":
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "origin": "https://x.com",
-            "referer": "https://x.com/",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "origin": "https://x.com", "referer": "https://x.com/",
         ]
         if let clientUserId { headers["x-twitter-client-user-id"] = clientUserId }
         return headers
     }
 
     func request(_ url: URL, method: String = "GET", body: Data? = nil, extra: [String: String] = [:]) async throws -> (Data, HTTPURLResponse) {
+        guard !authToken.isEmpty, !ct0.isEmpty else { throw ClientError("Both authToken and ct0 cookies are required") }
+        try Task.checkCancellation()
         var req = URLRequest(url: url)
         req.httpMethod = method
-        for (k, v) in baseHeaders() { req.setValue(v, forHTTPHeaderField: k) }
-        for (k, v) in extra { req.setValue(v, forHTTPHeaderField: k) }
+        baseHeaders().merging(extra) { _, new in new }.forEach { req.setValue($0.value, forHTTPHeaderField: $0.key) }
         req.httpBody = body
-        if let timeoutMs, timeoutMs > 0 {
-            req.timeoutInterval = Double(timeoutMs) / 1000.0
-        }
-        let (data, resp) = try await session.data(for: req)
-        guard let http = resp as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
+        if let timeoutMs, timeoutMs > 0 { req.timeoutInterval = timeoutMs / 1000 }
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         return (data, http)
     }
 
-    func queryId(_ name: String) async -> String {
-        await QueryIdStore.shared.getQueryId(name)
+    func queryId(_ operation: String) async -> String { await queryIdStore.getQueryId(operation) }
+    func refreshQueryIds() async { await queryIdStore.refresh(force: true, session: session) }
+
+    func queryIds(_ operation: String) async -> [String] {
+        let alternatives: [String: [String]] = [
+            "TweetDetail": ["97JF30KziU00483E_8elBA", "aFvUsJm2c-oDkJV75blV6g"],
+            "SearchTimeline": ["M1jEez78PEfVfbQLvlWMvQ", "5h0kNbk3ii97rmfY6CdgAA", "Tp1sewRU1AsZpBWhqCZicQ"],
+            "Bookmarks": ["RV1g3b8n_SGOHwkqKYSCFw", "tmd4ifV8RHltzn8ymGg1aw"],
+            "CreateFriendship": ["8h9JVdV8dlSyqyRDJEPCsA", "OPwKc1HXnBT_bWXfAlo-9g"],
+            "DestroyFriendship": ["ppXWuagMNXgvzx6WoXBW0Q", "8h9JVdV8dlSyqyRDJEPCsA"],
+            "UserByScreenName": ["xc8f1g7BYqr6VTzTbvNlGw", "qW5u-DAuXpMEG0zA1F7UGQ", "sLVLhk0bGj3MVFEKTdax1w"],
+        ]
+        return uniqueStrings([await queryId(operation)] + (alternatives[operation] ?? [fallbackQueryIds[operation] ?? ""]))
     }
 
-    func refreshQueryIds() async {
-        await QueryIdStore.shared.refresh(force: true, session: session)
+    func apiErrors(_ json: [String: Any]?) -> String? {
+        let errors = (JSON.array(json?["errors"]) ?? []).compactMap(JSON.object)
+        guard !errors.isEmpty else { return nil }
+        return errors.map { error in
+            let message = JSON.string(error["message"]) ?? "Unknown API error"
+            return JSON.int(error["code"]).map { "\(message) (\($0))" } ?? message
+        }.joined(separator: ", ")
     }
 
-    func graphqlGET(operation: String, queryIds: [String], params: [String: String]) async -> (json: [String: Any]?, status: Int, had404: Bool, error: String?) {
-        var had404 = false
-        var last: String?
-        for qid in queryIds {
-            var comps = URLComponents(string: "\(Self.graphqlBase)/\(qid)/\(operation)")!
-            comps.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
-            guard let url = comps.url else { continue }
-            do {
-                let (data, http) = try await request(url)
-                if http.statusCode == 404 {
-                    had404 = true
-                    last = "HTTP 404"
-                    continue
-                }
-                if http.statusCode >= 400 {
-                    last = "HTTP \(http.statusCode): \(String(data: data, encoding: .utf8)?.prefix(200) ?? "")"
-                    continue
-                }
-                return (JSON.parse(data), http.statusCode, had404, nil)
-            } catch {
-                last = error.localizedDescription
+    func parseGraph(_ data: Data, _ response: HTTPURLResponse, operation: String, allowPartial: Bool) -> GraphResponse {
+        let json = JSON.parse(data)
+        let apiError = apiErrors(json)
+        let errors = (JSON.array(json?["errors"]) ?? []).compactMap(JSON.object)
+        let mismatch = response.statusCode == 404 || errors.contains {
+            let message = (JSON.string($0["message"]) ?? "").lowercased()
+            return JSON.string(JSON.path($0, "extensions", "code")) == "GRAPHQL_VALIDATION_FAILED"
+                || message.contains("query: unspecified")
+                || (message.contains("rawquery") && message.contains("must be defined"))
+                || ((JSON.array($0["path"]) as? [String])?.contains("rawQuery") == true && message.contains("must be defined"))
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            return GraphResponse(json: json, status: response.statusCode,
+                                 error: "HTTP \(response.statusCode): \(apiError ?? String(data: data, encoding: .utf8).map { String($0.prefix(200)) } ?? "")", needsRefresh: mismatch)
+        }
+        guard let json else { return GraphResponse(status: response.statusCode, error: "Invalid JSON response") }
+        if let apiError {
+            let instructions = instructionsForOperation(json, operation)
+            let usefulDetail = operation == "TweetDetail" && JSON.path(json, "data", "tweetResult", "result") != nil
+            let usable = operation == "TweetDetail" ? usefulDetail || (!(JSON.array(instructions) ?? []).isEmpty) : instructions != nil
+            let fatalUserError = operation == "UserTweets" && (apiError.contains("User has been suspended") || apiError.contains("User not found"))
+            if !allowPartial || !usable || fatalUserError {
+                return GraphResponse(json: json, status: response.statusCode, error: apiError, needsRefresh: mismatch)
             }
         }
-        return (nil, 0, had404, last)
+        return GraphResponse(json: json, status: response.statusCode)
     }
 
-    func graphqlPOST(operation: String, queryIds: [String], body: [String: Any]) async -> (json: [String: Any]?, had404: Bool, error: String?) {
-        var had404 = false
-        var last: String?
-        let payload = try? JSONSerialization.data(withJSONObject: body)
-        for qid in queryIds {
-            let urls = [
-                URL(string: "\(Self.graphqlBase)/\(qid)/\(operation)")!,
-                URL(string: Self.graphqlBase)!,
-            ]
-            for url in urls {
+    func graphRead(operation: String, variables: [String: Any], featureSet: String? = nil,
+                   fieldToggles: [String: Bool]? = nil, allowPartial: Bool = false) async -> GraphResponse {
+        var last = GraphResponse(error: "No query ID available for \(operation)")
+        for attempt in 0..<2 {
+            var shouldRefresh = false
+            for id in await queryIds(operation) {
+                var params = ["variables": jsonString(variables)]
+                var features = featureSet.map { ClientFeatures.values($0) }
+                if operation == "TweetDetail" {
+                    features?.merge(["articles_preview_enabled": true, "articles_rest_api_enabled": true,
+                                     "responsive_web_graphql_skip_user_profile_image_extensions_enabled": false,
+                                     "creator_subscriptions_tweet_preview_api_enabled": true,
+                                     "graphql_is_translatable_rweb_tweet_is_translatable_enabled": true,
+                                     "view_counts_everywhere_api_enabled": true, "longform_notetweets_consumption_enabled": true,
+                                     "responsive_web_twitter_article_tweet_consumption_enabled": true,
+                                     "freedom_of_speech_not_reach_fetch_enabled": true, "standardized_nudges_misinfo": true,
+                                     "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": true,
+                                     "rweb_video_timestamps_enabled": true]) { _, new in new }
+                }
+                let isSearch = operation == "SearchTimeline"
+                if let features, !isSearch { params["features"] = jsonString(features) }
+                if let fieldToggles { params["fieldToggles"] = jsonString(fieldToggles) }
+                var components = URLComponents(string: "\(Self.graphqlBase)/\(id)/\(operation)")!
+                components.queryItems = params.keys.sorted().map { URLQueryItem(name: $0, value: params[$0]) }
                 do {
-                    let (data, http) = try await request(
-                        url,
-                        method: "POST",
-                        body: payload,
-                        extra: ["content-type": "application/json"]
-                    )
-                    if http.statusCode == 404 {
-                        had404 = true
-                        last = "HTTP 404"
-                        continue
+                    var body: Data?
+                    if isSearch { body = try JSONSerialization.data(withJSONObject: ["features": features ?? [:], "queryId": id]) }
+                    var result = try await request(components.url!, method: isSearch ? "POST" : "GET", body: body, extra: ["content-type": "application/json"])
+                    if operation == "Bookmarks" || operation == "BookmarkFolderTimeline" {
+                        for retry in 0..<2 {
+                            guard [429, 500, 502, 503, 504].contains(result.1.statusCode) else { break }
+                            let retryAfter = result.1.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init).flatMap { seconds -> Int? in
+                                guard seconds >= 0, seconds <= Int.max / 1000 else { return nil }
+                                return seconds * 1000
+                            }
+                            let delay = retryAfter ?? (500 * (1 << retry))
+                            try await sleepMilliseconds(delay)
+                            result = try await request(components.url!, extra: ["content-type": "application/json"])
+                        }
                     }
-                    if http.statusCode >= 400 {
-                        last = "HTTP \(http.statusCode): \(String(data: data, encoding: .utf8)?.prefix(200) ?? "")"
-                        continue
+                    // TweetDetail supports a read-only POST fallback when the GET operation URL is absent.
+                    if result.1.statusCode == 404, operation == "TweetDetail" {
+                        var payload: [String: Any] = ["variables": variables, "features": features ?? [:], "queryId": id]
+                        if let fieldToggles { payload["fieldToggles"] = fieldToggles }
+                        result = try await request(URL(string: "\(Self.graphqlBase)/\(id)/\(operation)")!, method: "POST",
+                                                   body: try JSONSerialization.data(withJSONObject: payload), extra: ["content-type": "application/json"])
                     }
-                    return (JSON.parse(data), had404, nil)
+                    last = parseGraph(result.0, result.1, operation: operation, allowPartial: allowPartial)
+                    if last.success { return last }
+                    if !last.needsRefresh { return last }
+                    shouldRefresh = true
                 } catch {
-                    last = error.localizedDescription
+                    return GraphResponse(error: error.localizedDescription)
                 }
             }
+            guard attempt == 0, shouldRefresh else { return last }
+            await refreshQueryIds()
         }
-        return (nil, had404, last)
+        return last
+    }
+
+    func graphMutation(operation: String, variables: [String: Any], featureSet: String? = nil, referer: String? = nil) async -> GraphResponse {
+        if operation != "DeleteBookmark", resolveUserBeforeMutation, clientUserId == nil { _ = await getCurrentUser() }
+        let friendship = operation == "CreateFriendship" || operation == "DestroyFriendship"
+        var last = GraphResponse(error: "Unable to perform \(operation)")
+        for attempt in 0..<(friendship ? 2 : 3) {
+            let ids = friendship ? await queryIds(operation) : [await queryId(operation)]
+            for id in ids {
+                var payload: [String: Any] = ["variables": variables, "queryId": id]
+                if let featureSet { payload["features"] = ClientFeatures.values(featureSet) }
+                let url = attempt == 2 ? Self.graphqlBase : "\(Self.graphqlBase)/\(id)/\(operation)"
+                do {
+                    let result = try await request(URL(string: url)!, method: "POST", body: try JSONSerialization.data(withJSONObject: payload),
+                                                   extra: ["content-type": "application/json", "referer": referer ?? "https://x.com/"])
+                    last = parseGraph(result.0, result.1, operation: operation, allowPartial: false)
+                    // Never repeat a mutation after timeout, 429, 5xx, or an ambiguous response.
+                    if result.1.statusCode != 404 || attempt == 2 { return last }
+                } catch { return GraphResponse(error: error.localizedDescription) }
+            }
+            if attempt == 0 { await refreshQueryIds() }
+        }
+        return last
+    }
+
+    func instructionsForOperation(_ json: [String: Any]?, _ operation: String) -> Any? {
+        switch operation {
+        case "TweetDetail": return JSON.path(json, "data", "threaded_conversation_with_injections_v2", "instructions")
+        case "SearchTimeline": return JSON.path(json, "data", "search_by_raw_query", "search_timeline", "timeline", "instructions")
+        case "HomeTimeline", "HomeLatestTimeline": return JSON.path(json, "data", "home", "home_timeline_urt", "instructions")
+        case "Bookmarks": return JSON.path(json, "data", "bookmark_timeline_v2", "timeline", "instructions") ?? JSON.path(json, "data", "bookmark_timeline", "timeline", "instructions")
+        case "BookmarkFolderTimeline": return JSON.path(json, "data", "bookmark_collection_timeline", "timeline", "instructions")
+        case "ListLatestTweetsTimeline": return JSON.path(json, "data", "list", "tweets_timeline", "timeline", "instructions")
+        case "GenericTimelineById": return JSON.path(json, "data", "timeline", "timeline", "instructions")
+        case "ListOwnerships": return JSON.path(json, "data", "user", "result", "timeline", "timeline", "instructions")
+        case "ListMemberships": return JSON.path(json, "data", "user", "result", "timeline", "timeline", "instructions")
+        default: return JSON.path(json, "data", "user", "result", "timeline", "timeline", "instructions")
+        }
+    }
+
+    func tweetDetail(_ tweetId: String, cursor: String?) async -> GraphResponse {
+        var variables: [String: Any] = ["focalTweetId": tweetId, "with_rux_injections": false, "rankingMode": "Relevance",
+            "includePromotedContent": true, "withCommunity": true, "withQuickPromoteEligibilityTweetFields": true,
+            "withBirdwatchNotes": true, "withVoice": true]
+        if let cursor { variables["cursor"] = cursor }
+        return await graphRead(operation: "TweetDetail", variables: variables, featureSet: "tweetDetail",
+                               fieldToggles: ["withPayments": false, "withAuxiliaryUserLabels": false, "withArticleRichContentState": true,
+                                              "withArticlePlainText": true, "withGrokAnalyze": false, "withDisallowedReplyControls": false], allowPartial: true)
     }
 
     public func getTweet(_ tweetId: String, includeRaw: Bool = false) async -> TweetListResult {
-        let page = await fetchTweetDetail(tweetId, cursor: nil, includeRaw: includeRaw)
-        if !page.success { return page }
-        let target = page.tweets.first { $0.id == tweetId }
-        return TweetListResult(success: true, tweets: target.map { [$0] } ?? page.tweets, nextCursor: nil, error: nil, had404: false)
+        let response = await tweetDetail(tweetId, cursor: nil)
+        guard response.success else { return failure(response.error, had404: response.needsRefresh) }
+        let instructions = instructionsForOperation(response.json, "TweetDetail")
+        var tweet = JSON.object(JSON.path(response.json, "data", "tweetResult", "result"))
+            .flatMap { JSON.mapTweet($0, quoteDepth: quoteDepth, includeRaw: includeRaw) }
+        if tweet?.id != tweetId { tweet = JSON.walkTweets(instructions, quoteDepth: quoteDepth, includeRaw: includeRaw).first { $0.id == tweetId } }
+        guard var tweet else { return failure("Tweet not found in response") }
+        if let title = tweet.article?.title, tweet.text.trimmingCharacters(in: .whitespacesAndNewlines) == title.trimmingCharacters(in: .whitespacesAndNewlines), let userId = tweet.authorId {
+            if let fallback = await articleText(userId: userId, tweetId: tweetId) { tweet = tweet.replacingText(fallback) }
+        }
+        return .init(success: true, tweets: [tweet], nextCursor: nil, error: nil, had404: false)
+    }
+
+    func articleText(userId: String, tweetId: String) async -> String? {
+        let response = await graphRead(operation: "UserArticlesTweets", variables: [
+            "userId": userId, "count": 20, "includePromotedContent": true, "withVoice": true,
+            "withQuickPromoteEligibilityTweetFields": true, "withBirdwatchNotes": true, "withCommunity": true,
+            "withSafetyModeUserFields": true, "withSuperFollowsUserFields": true, "withDownvotePerspective": false,
+            "withReactionsMetadata": false, "withReactionsPerspective": false, "withSuperFollowsTweetFields": true,
+            "withSuperFollowsReplyCount": false, "withClientEventToken": false,
+        ], featureSet: "article", fieldToggles: ["withPayments": false, "withAuxiliaryUserLabels": false, "withArticleRichContentState": true,
+                                                     "withArticlePlainText": true, "withGrokAnalyze": false, "withDisallowedReplyControls": false])
+        guard response.success else { return nil }
+        for item in timelineItemContents(instructionsForOperation(response.json, "UserArticlesTweets")) {
+            guard var tweet = JSON.object(JSON.path(item, "tweet_results", "result")) else { continue }
+            if let inner = JSON.object(tweet["tweet"]) { tweet = inner }
+            guard JSON.string(tweet["rest_id"]) == tweetId, let article = JSON.object(tweet["article"]) else { continue }
+            let inner = JSON.object(JSON.path(article, "article_results", "result")) ?? article
+            guard let plainText = JSON.string(inner["plain_text"]) ?? JSON.string(article["plain_text"]), !plainText.isEmpty else { return nil }
+            let title = JSON.string(inner["title"]) ?? JSON.string(article["title"])
+            return title.map { "\($0)\n\n\(plainText)" } ?? plainText
+        }
+        return nil
+    }
+
+    func fetchTweetDetail(_ tweetId: String, cursor: String?, includeRaw: Bool) async -> TweetListResult {
+        let response = await tweetDetail(tweetId, cursor: cursor)
+        guard response.success else { return failure(response.error, had404: response.needsRefresh) }
+        let instructions = instructionsForOperation(response.json, "TweetDetail")
+        return .init(success: true, tweets: JSON.walkTweets(instructions, quoteDepth: quoteDepth, includeRaw: includeRaw), nextCursor: JSON.cursor(instructions), error: nil, had404: false)
     }
 
     public func getReplies(_ tweetId: String, includeRaw: Bool = false) async -> TweetListResult {
-        let page = await fetchTweetDetail(tweetId, cursor: nil, includeRaw: includeRaw)
-        if !page.success { return page }
-        let replies = page.tweets.filter { $0.inReplyToStatusId == tweetId }
-        return TweetListResult(success: true, tweets: replies, nextCursor: page.nextCursor, error: nil, had404: false)
+        var page = await fetchTweetDetail(tweetId, cursor: nil, includeRaw: includeRaw)
+        page.tweets = page.tweets.filter { $0.inReplyToStatusId == tweetId }
+        return page
     }
 
     public func getThread(_ tweetId: String, includeRaw: Bool = false) async -> TweetListResult {
-        let page = await fetchTweetDetail(tweetId, cursor: nil, includeRaw: includeRaw)
-        if !page.success { return page }
-        let target = page.tweets.first { $0.id == tweetId }
-        let rootId = target?.conversationId ?? tweetId
-        let thread = page.tweets.filter { $0.conversationId == rootId }.sorted {
-            ($0.createdAt ?? "") < ($1.createdAt ?? "")
-        }
-        return TweetListResult(success: true, tweets: thread, nextCursor: page.nextCursor, error: nil, had404: false)
+        var page = await fetchTweetDetail(tweetId, cursor: nil, includeRaw: includeRaw)
+        let root = page.tweets.first { $0.id == tweetId }?.conversationId ?? tweetId
+        page.tweets = page.tweets.filter { $0.conversationId == root }.sorted(by: tweetCreatedAtAsc)
+        return page
     }
 
     public func getRepliesPaged(_ tweetId: String, includeRaw: Bool, maxPages: Int?, cursor: String?, pageDelayMs: Int) async -> TweetListResult {
-        await paginateTweets(maxPages: maxPages, cursor: cursor, delay: pageDelayMs) { cur in
-            let page = await self.fetchTweetDetail(tweetId, cursor: cur, includeRaw: includeRaw)
-            let replies = page.tweets.filter { $0.inReplyToStatusId == tweetId }
-            return TweetListResult(success: page.success, tweets: replies, nextCursor: page.nextCursor, error: page.error, had404: page.had404)
+        await paginateTweets(limit: nil, maxPages: maxPages, cursor: cursor, delay: pageDelayMs, stopWhenEmpty: false) { cur, _ in
+            var page = await self.fetchTweetDetail(tweetId, cursor: cur, includeRaw: includeRaw)
+            page.tweets = page.tweets.filter { $0.inReplyToStatusId == tweetId }
+            return page
         }
     }
 
     public func getThreadPaged(_ tweetId: String, includeRaw: Bool, maxPages: Int?, cursor: String?, pageDelayMs: Int) async -> TweetListResult {
         var rootId: String?
-        let r = await paginateTweets(maxPages: maxPages, cursor: cursor, delay: pageDelayMs) { cur in
-            let page = await self.fetchTweetDetail(tweetId, cursor: cur, includeRaw: includeRaw)
-            if rootId == nil {
-                let target = page.tweets.first { $0.id == tweetId }
-                rootId = target?.conversationId ?? tweetId
-            }
-            let thread = page.tweets.filter { $0.conversationId == rootId }
-            return TweetListResult(success: page.success, tweets: thread, nextCursor: page.nextCursor, error: page.error, had404: page.had404)
+        var result = await paginateTweets(limit: nil, maxPages: maxPages, cursor: cursor, delay: pageDelayMs, stopWhenEmpty: false) { cur, _ in
+            var page = await self.fetchTweetDetail(tweetId, cursor: cur, includeRaw: includeRaw)
+            if rootId == nil { rootId = page.tweets.first { $0.id == tweetId }?.conversationId ?? tweetId }
+            page.tweets = page.tweets.filter { $0.conversationId == rootId }
+            return page
         }
-        let sorted = r.tweets.sorted { ($0.createdAt ?? "") < ($1.createdAt ?? "") }
-        return TweetListResult(success: r.success, tweets: sorted, nextCursor: r.nextCursor, error: r.error, had404: r.had404)
+        result.tweets.sort(by: tweetCreatedAtAsc)
+        return result
     }
 
-    private func paginateTweets(maxPages: Int?, cursor: String?, delay: Int, fetch: (String?) async -> TweetListResult) async -> TweetListResult {
-        var all: [TweetData] = []
-        var seen = Set<String>()
-        var next = cursor
-        var pages = 0
-        var lastError: String?
-        while true {
-            if pages > 0, delay > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
-            }
-            let page = await fetch(next)
-            if !page.success {
-                lastError = page.error
-                if all.isEmpty { return page }
-                return TweetListResult(success: false, tweets: all, nextCursor: next, error: lastError, had404: page.had404)
-            }
-            pages += 1
-            for t in page.tweets where seen.insert(t.id).inserted { all.append(t) }
-            let pageCursor = page.nextCursor
-            if pageCursor == nil || pageCursor == next {
-                return TweetListResult(success: true, tweets: all, nextCursor: nil, error: nil, had404: false)
-            }
-            if let maxPages, pages >= maxPages {
-                return TweetListResult(success: true, tweets: all, nextCursor: pageCursor, error: nil, had404: false)
-            }
-            next = pageCursor
-        }
+    func failure(_ error: String?, had404: Bool = false) -> TweetListResult {
+        .init(success: false, tweets: [], nextCursor: nil, error: error ?? "Unknown API error", had404: had404)
     }
+}
 
-    func fetchTweetDetail(_ tweetId: String, cursor: String?, includeRaw: Bool) async -> TweetListResult {
-        let primary = await queryId("TweetDetail")
-        let ids = Array(Set([primary, "97JF30KziU00483E_8elBA", "aFvUsJm2c-oDkJV75blV6g", "_NvJCnIjOW__EP5-RF197A"]))
-        var variables: [String: Any] = [
-            "focalTweetId": tweetId,
-            "with_rux_injections": false,
-            "includePromotedContent": true,
-            "withCommunity": true,
-            "withQuickPromoteEligibilityTweetFields": true,
-            "withBirdwatchNotes": true,
-            "withVoice": true,
-            "withV2Timeline": true,
-        ]
-        if let cursor { variables["cursor"] = cursor }
-        let params = [
-            "variables": stringify(variables),
-            "features": stringify(tweetDetailFeatures()),
-            "fieldToggles": stringify(["withArticleRichContentState": true, "withArticlePlainText": false]),
-        ]
-        func attempt() async -> TweetListResult {
-            let r = await graphqlGET(operation: "TweetDetail", queryIds: ids, params: params)
-            if let err = r.error, r.json == nil {
-                return TweetListResult(success: false, tweets: [], nextCursor: nil, error: err, had404: r.had404)
-            }
-            let instructions = JSON.path(r.json, "data", "threaded_conversation_with_injections_v2", "instructions")
-            let tweets = JSON.walkTweets(instructions, quoteDepth: quoteDepth, includeRaw: includeRaw)
-            return TweetListResult(success: true, tweets: tweets, nextCursor: JSON.cursor(instructions), error: nil, had404: r.had404)
-        }
-        var first = await attempt()
-        if !first.success, first.had404 {
-            await refreshQueryIds()
-            first = await attempt()
-        }
-        return first
-    }
-
-    public func follow(_ userId: String) async -> MutationResult {
-        let rest = await followRest(userId, action: "create")
-        if rest.success { return rest }
-        return await followGql(userId, follow: true)
-    }
-
-    public func unfollow(_ userId: String) async -> MutationResult {
-        let rest = await followRest(userId, action: "destroy")
-        if rest.success { return rest }
-        return await followGql(userId, follow: false)
-    }
-
-    private func followRest(_ userId: String, action: String) async -> MutationResult {
-        let urls = [
-            "https://x.com/i/api/1.1/friendships/\(action).json",
-            "https://api.twitter.com/1.1/friendships/\(action).json",
-        ]
-        let body = "user_id=\(userId)&skip_status=true".data(using: .utf8)
-        var last: String?
-        for url in urls {
-            do {
-                let (data, http) = try await request(
-                    URL(string: url)!,
-                    method: "POST",
-                    body: body,
-                    extra: ["content-type": "application/x-www-form-urlencoded"]
-                )
-                if let obj = JSON.parse(data), let errors = JSON.array(obj["errors"]), let first = JSON.object(errors.first) {
-                    let code = JSON.int(first["code"])
-                    if code == 160 { return MutationResult(success: true, userId: nil, username: nil, error: nil, tweetId: nil) }
-                    if code == 162 { return MutationResult(success: false, userId: nil, username: nil, error: "You have been blocked from following this account", tweetId: nil) }
-                    if code == 108 { return MutationResult(success: false, userId: nil, username: nil, error: "User not found", tweetId: nil) }
-                    last = "\(JSON.string(first["message"]) ?? "") (code \(code ?? 0))"
-                    continue
-                }
-                if http.statusCode >= 400 {
-                    last = "HTTP \(http.statusCode)"
-                    continue
-                }
-                let obj = JSON.parse(data)
-                return MutationResult(
-                    success: true,
-                    userId: JSON.string(obj?["id_str"]),
-                    username: JSON.string(obj?["screen_name"]),
-                    error: nil,
-                    tweetId: nil
-                )
-            } catch {
-                last = error.localizedDescription
-            }
-        }
-        return MutationResult(success: false, userId: nil, username: nil, error: last, tweetId: nil)
-    }
-
-    private func followGql(_ userId: String, follow: Bool) async -> MutationResult {
-        let op = follow ? "CreateFriendship" : "DestroyFriendship"
-        let qid = await queryId(op)
-        let r = await graphqlPOST(operation: op, queryIds: [qid], body: [
-            "variables": ["user_id": userId],
-            "queryId": qid,
-        ])
-        if r.json != nil { return MutationResult(success: true, userId: userId, username: nil, error: nil, tweetId: nil) }
-        return MutationResult(success: false, userId: nil, username: nil, error: r.error, tweetId: nil)
-    }
-
-    public func getUserIdByUsername(_ username: String) async -> (success: Bool, userId: String?, username: String?, name: String?, error: String?) {
-        guard let handle = normalizeHandle(username) else {
-            return (false, nil, nil, nil, "Invalid username: \(username)")
-        }
-        let qids = ["xc8f1g7BYqr6VTzTbvNlGw", "qW5u-DAuXpMEG0zA1F7UGQ", "sLVLhk0bGj3MVFEKTdax1w"]
-        let variables = stringify(["screen_name": handle, "withSafetyModeUserFields": true])
-        let r = await graphqlGET(operation: "UserByScreenName", queryIds: qids, params: [
-            "variables": variables,
-            "features": stringify(["hidden_profile_subscriptions_enabled": true]),
-        ])
-        let result = JSON.object(JSON.path(r.json, "data", "user", "result"))
-        if JSON.string(result?["__typename"]) == "UserUnavailable" {
-            return (false, nil, nil, nil, "User @\(handle) not found or unavailable")
-        }
-        if let id = JSON.string(result?["rest_id"]) {
-            let uname = JSON.string(JSON.path(result, "legacy", "screen_name")) ?? JSON.string(JSON.path(result, "core", "screen_name")) ?? handle
-            let name = JSON.string(JSON.path(result, "legacy", "name")) ?? JSON.string(JSON.path(result, "core", "name"))
-            return (true, id, uname, name, nil)
-        }
-        return (false, nil, nil, nil, r.error ?? "Could not parse user data from response")
-    }
-
-    public func getUserAboutAccount(_ username: String) async -> (success: Bool, about: AboutProfile?, error: String?) {
-        guard let handle = normalizeHandle(username) else {
-            return (false, nil, "Invalid username: \(username)")
-        }
-        let primary = await queryId("AboutAccountQuery")
-        func attempt() async -> (success: Bool, about: AboutProfile?, error: String?, had404: Bool) {
-            let r = await graphqlGET(
-                operation: "AboutAccountQuery",
-                queryIds: [primary, "zs_jFPFT78rBpXv9Z3U2YQ"],
-                params: ["variables": stringify(["screenName": handle])]
-            )
-            if let about = JSON.object(JSON.path(r.json, "data", "user_result_by_screen_name", "result", "about_profile")) {
-                let mapped = AboutProfile(
-                    accountBasedIn: JSON.string(about["account_based_in"]),
-                    source: JSON.string(about["source"]),
-                    createdCountryAccurate: JSON.bool(about["created_country_accurate"]),
-                    locationAccurate: JSON.bool(about["location_accurate"]),
-                    learnMoreUrl: JSON.string(about["learn_more_url"])
-                )
-                return (true, mapped, nil, r.had404)
-            }
-            return (false, nil, r.error ?? "Missing about_profile in response", r.had404)
-        }
-        var first = await attempt()
-        if !first.success, first.had404 {
-            await refreshQueryIds()
-            first = await attempt()
-        }
-        return (first.success, first.about, first.error)
-    }
-
-    public func getCurrentUser() async -> (success: Bool, user: TwitterUser?, error: String?) {
-        let urls = [
-            "https://x.com/i/api/account/settings.json",
-            "https://api.twitter.com/1.1/account/settings.json",
-            "https://x.com/i/api/account/verify_credentials.json?skip_status=true&include_entities=false",
-            "https://api.twitter.com/1.1/account/verify_credentials.json?skip_status=true&include_entities=false",
-        ]
-        var last: String?
-        for u in urls {
-            guard let url = URL(string: u) else { continue }
-            do {
-                let (data, http) = try await request(url)
-                if http.statusCode >= 400 {
-                    last = "HTTP \(http.statusCode)"
-                    continue
-                }
-                if let obj = JSON.parse(data) {
-                    let username = JSON.string(obj["screen_name"]) ?? JSON.string(JSON.path(obj, "user", "screen_name"))
-                    let name = JSON.string(obj["name"]) ?? JSON.string(JSON.path(obj, "user", "name"))
-                    let userId = JSON.string(obj["user_id"]) ?? JSON.string(obj["user_id_str"])
-                        ?? JSON.string(JSON.path(obj, "user", "id_str"))
-                    if let username {
-                        if let userId { clientUserId = userId }
-                        return (true, TwitterUser(id: userId ?? "", username: username, name: name ?? username), nil)
-                    }
-                }
-                last = "Could not determine current user from response"
-            } catch {
-                last = error.localizedDescription
-            }
-        }
-        for page in ["https://x.com/settings/account", "https://twitter.com/settings/account"] {
-            guard let url = URL(string: page) else { continue }
-            do {
-                var req = URLRequest(url: url)
-                req.setValue(cookieHeader, forHTTPHeaderField: "cookie")
-                req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", forHTTPHeaderField: "user-agent")
-                let (data, resp) = try await session.data(for: req)
-                let http = resp as? HTTPURLResponse
-                if let http, http.statusCode >= 400 {
-                    last = "HTTP \(http.statusCode) (settings page)"
-                    continue
-                }
-                let html = String(data: data, encoding: .utf8) ?? ""
-                let username = capture(html, "\"screen_name\":\"([^\"]+)\"")
-                let userId = capture(html, "\"user_id\"\\s*:\\s*\"(\\d+)\"")
-                if let username, let userId {
-                    clientUserId = userId
-                    return (true, TwitterUser(id: userId, username: username, name: username), nil)
-                }
-                last = "Could not parse settings page for user info"
-            } catch {
-                last = error.localizedDescription
-            }
-        }
-        return (false, nil, last)
-    }
-
-    public func like(_ tweetId: String) async -> MutationResult { await mutateTweet("FavoriteTweet", tweetId: tweetId) }
-    public func unlike(_ tweetId: String) async -> MutationResult { await mutateTweet("UnfavoriteTweet", tweetId: tweetId) }
-    public func retweet(_ tweetId: String) async -> MutationResult {
-        await mutateTweet("CreateRetweet", tweetId: tweetId, extra: ["source_tweet_id": tweetId])
-    }
-    public func unretweet(_ tweetId: String) async -> MutationResult { await mutateTweet("DeleteRetweet", tweetId: tweetId) }
-    public func bookmark(_ tweetId: String) async -> MutationResult { await mutateTweet("CreateBookmark", tweetId: tweetId) }
-    public func unbookmark(_ tweetId: String) async -> MutationResult { await mutateTweet("DeleteBookmark", tweetId: tweetId) }
-
-    private func mutateTweet(_ op: String, tweetId: String, extra: [String: String] = [:]) async -> MutationResult {
-        var vars: [String: Any] = ["tweet_id": tweetId]
-        for (k, v) in extra { vars[k] = v }
-        func attempt() async -> (MutationResult, Bool) {
-            let qid = await queryId(op)
-            let r = await graphqlPOST(operation: op, queryIds: [qid], body: ["variables": vars, "queryId": qid])
-            if r.json != nil { return (MutationResult(success: true, userId: nil, username: nil, error: nil, tweetId: tweetId), r.had404) }
-            return (MutationResult(success: false, userId: nil, username: nil, error: r.error, tweetId: nil), r.had404)
-        }
-        var (res, had404) = await attempt()
-        if !res.success, had404 {
-            await refreshQueryIds()
-            (res, _) = await attempt()
-        }
-        return res
-    }
-
-    public func createTweet(text: String, replyTo: String? = nil) async -> MutationResult {
-        var vars: [String: Any] = ["tweet_text": text, "media": ["media_entities": [], "possibly_sensitive": false]]
-        if let replyTo {
-            vars["reply"] = ["in_reply_to_tweet_id": replyTo, "exclude_reply_user_ids": []]
-        }
-        let qid = await queryId("CreateTweet")
-        let r = await graphqlPOST(operation: "CreateTweet", queryIds: [qid], body: [
-            "variables": vars,
-            "features": tweetDetailFeatures(),
-            "queryId": qid,
-        ])
-        if let id = JSON.string(JSON.path(r.json, "data", "create_tweet", "tweet_results", "result", "rest_id")) {
-            return MutationResult(success: true, userId: nil, username: nil, error: nil, tweetId: id)
-        }
-        if let errors = JSON.array(JSON.path(r.json, "errors")), let first = JSON.object(errors.first), JSON.int(first["code"]) == 226 {
-            return await statusUpdate(text: text, replyTo: replyTo)
-        }
-        return MutationResult(success: r.json != nil, userId: nil, username: nil, error: r.error, tweetId: nil)
-    }
-
-    private func statusUpdate(text: String, replyTo: String?) async -> MutationResult {
-        var body = "status=\(text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text)"
-        if let replyTo { body += "&in_reply_to_status_id=\(replyTo)" }
-        do {
-            let (data, http) = try await request(
-                URL(string: "https://x.com/i/api/1.1/statuses/update.json")!,
-                method: "POST",
-                body: body.data(using: .utf8),
-                extra: ["content-type": "application/x-www-form-urlencoded"]
-            )
-            let obj = JSON.parse(data)
-            if http.statusCode < 400 {
-                return MutationResult(success: true, userId: nil, username: nil, error: nil, tweetId: JSON.string(obj?["id_str"]))
-            }
-            return MutationResult(success: false, userId: nil, username: nil, error: "HTTP \(http.statusCode)", tweetId: nil)
-        } catch {
-            return MutationResult(success: false, userId: nil, username: nil, error: error.localizedDescription, tweetId: nil)
-        }
-    }
-
-    public func search(_ query: String, includeRaw: Bool = false) async -> TweetListResult {
-        await timeline(operation: "SearchTimeline", variables: [
-            "rawQuery": query, "count": 20, "querySource": "typed_query", "product": "Latest",
-        ], includeRaw: includeRaw)
-    }
-
-    public func home(includeRaw: Bool = false) async -> TweetListResult {
-        await timeline(operation: "HomeLatestTimeline", variables: ["count": 20, "includePromotedContent": true], includeRaw: includeRaw)
-    }
-
-    public func userTweets(userId: String, includeRaw: Bool = false) async -> TweetListResult {
-        await timeline(operation: "UserTweets", variables: ["userId": userId, "count": 20, "includePromotedContent": true], includeRaw: includeRaw)
-    }
-
-    public func likes(userId: String, includeRaw: Bool = false) async -> TweetListResult {
-        await timeline(operation: "Likes", variables: ["userId": userId, "count": 20, "includePromotedContent": false], includeRaw: includeRaw)
-    }
-
-    public func bookmarks(includeRaw: Bool = false) async -> TweetListResult {
-        await timeline(operation: "Bookmarks", variables: ["count": 20], includeRaw: includeRaw)
-    }
-
-    public func following(userId: String) async -> UserListResult { await usersTimeline("Following", userId: userId) }
-    public func followers(userId: String) async -> UserListResult { await usersTimeline("Followers", userId: userId) }
-
-    public func lists() async -> UserListResult {
-        UserListResult(success: true, users: [], nextCursor: nil, error: nil)
-    }
-
-    public func listTimeline(_ listId: String, includeRaw: Bool = false) async -> TweetListResult {
-        await timeline(operation: "ListLatestTweetsTimeline", variables: ["listId": listId, "count": 20], includeRaw: includeRaw)
-    }
-
-    public func news() async -> [[String: String]] {
-        let qid = await queryId("ExplorePage")
-        let r = await graphqlGET(operation: "ExplorePage", queryIds: [qid], params: [
-            "variables": stringify(["includeTweetReplies": false]),
-        ])
-        return flattenTrends(r.json)
-    }
-
-    private func flattenTrends(_ json: [String: Any]?) -> [[String: String]] {
-        var out: [[String: String]] = []
-        func walk(_ any: Any?) {
-            if let obj = JSON.object(any) {
-                if let name = JSON.string(obj["name"]), obj["trend_url"] != nil || obj["query"] != nil {
-                    out.append(["name": name, "query": JSON.string(obj["query"]) ?? name])
-                }
-                for v in obj.values { walk(v) }
-            } else if let arr = JSON.array(any) {
-                arr.forEach(walk)
-            }
-        }
-        walk(json)
-        return out
-    }
-
-    private func timeline(operation: String, variables: [String: Any], includeRaw: Bool) async -> TweetListResult {
-        let qid = await queryId(operation)
-        let r = await graphqlGET(operation: operation, queryIds: [qid], params: [
-            "variables": stringify(variables),
-            "features": stringify(tweetDetailFeatures()),
-        ])
-        if r.json == nil { return TweetListResult(success: false, tweets: [], nextCursor: nil, error: r.error, had404: r.had404) }
-        let instructions = findInstructions(r.json)
-        let tweets = JSON.walkTweets(instructions, quoteDepth: quoteDepth, includeRaw: includeRaw)
-        return TweetListResult(success: true, tweets: tweets, nextCursor: JSON.cursor(instructions), error: nil, had404: r.had404)
-    }
-
-    private func usersTimeline(_ operation: String, userId: String) async -> UserListResult {
-        let qid = await queryId(operation)
-        let r = await graphqlGET(operation: operation, queryIds: [qid], params: [
-            "variables": stringify(["userId": userId, "count": 20, "includePromotedContent": false]),
-            "features": stringify(tweetDetailFeatures()),
-        ])
-        var users: [TwitterUser] = []
-        func walk(_ any: Any?) {
-            if let obj = JSON.object(any) {
-                if let rest = JSON.string(obj["rest_id"]),
-                   let uname = JSON.string(JSON.path(obj, "legacy", "screen_name")) ?? JSON.string(JSON.path(obj, "core", "screen_name"))
-                {
-                    users.append(TwitterUser(id: rest, username: uname, name: JSON.string(JSON.path(obj, "legacy", "name"))))
-                }
-                for v in obj.values { walk(v) }
-            } else if let arr = JSON.array(any) {
-                arr.forEach(walk)
-            }
-        }
-        walk(r.json)
-        return UserListResult(success: r.json != nil, users: uniqueUsers(users), nextCursor: JSON.cursor(findInstructions(r.json)), error: r.error)
-    }
-
-    private func uniqueUsers(_ users: [TwitterUser]) -> [TwitterUser] {
-        var seen = Set<String>()
-        return users.filter { seen.insert($0.id).inserted }
-    }
-
-    private func findInstructions(_ json: [String: Any]?) -> Any? {
-        var found: Any?
-        func walk(_ any: Any?) {
-            if found != nil { return }
-            if let obj = JSON.object(any) {
-                if obj["instructions"] != nil { found = obj["instructions"]; return }
-                for v in obj.values { walk(v) }
-            } else if let arr = JSON.array(any) {
-                arr.forEach(walk)
-            }
-        }
-        walk(json)
-        return found
-    }
-
-    private func stringify(_ obj: Any) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: obj),
-              let s = String(data: data, encoding: .utf8) else { return "{}" }
-        return s
-    }
-
-    private func tweetDetailFeatures() -> [String: Any] {
-        [
-            "rweb_lists_timeline_redesign_enabled": true,
-            "responsive_web_graphql_exclude_directive_enabled": true,
-            "verified_phone_label_enabled": false,
-            "creator_subscriptions_tweet_preview_api_enabled": true,
-            "responsive_web_graphql_timeline_navigation_enabled": true,
-            "responsive_web_graphql_skip_user_profile_image_extensions_enabled": false,
-            "tweetypie_unmention_optimization_enabled": true,
-            "responsive_web_edit_tweet_api_enabled": true,
-            "graphql_is_translatable_rweb_tweet_is_translatable_enabled": true,
-            "view_counts_everywhere_api_enabled": true,
-            "longform_notetweets_consumption_enabled": true,
-            "responsive_web_twitter_article_tweet_consumption_enabled": true,
-            "tweet_awards_web_tipping_enabled": false,
-            "freedom_of_speech_not_reach_fetch_enabled": true,
-            "standardized_nudges_misinfo": true,
-            "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": true,
-            "longform_notetweets_rich_text_read_enabled": true,
-            "longform_notetweets_inline_media_enabled": true,
-            "responsive_web_media_download_video_enabled": false,
-            "responsive_web_enhance_cards_enabled": false,
-        ]
-    }
-
-    private func capture(_ text: String, _ pattern: String) -> String? {
-        guard let re = try? NSRegularExpression(pattern: pattern),
-              let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-              let r = Range(m.range(at: 1), in: text) else { return nil }
-        return String(text[r])
-    }
+struct ClientError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
 }

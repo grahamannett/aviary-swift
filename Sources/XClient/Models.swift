@@ -29,20 +29,20 @@ public struct TweetArticle: Codable, Sendable {
 }
 
 public final class TweetData: Codable, Sendable {
-    public var id: String
-    public var text: String
-    public var author: TweetAuthor
-    public var authorId: String?
-    public var createdAt: String?
-    public var replyCount: Int?
-    public var retweetCount: Int?
-    public var likeCount: Int?
-    public var conversationId: String?
-    public var inReplyToStatusId: String?
-    public var quotedTweet: TweetData?
-    public var media: [TweetMedia]?
-    public var article: TweetArticle?
-    public var _raw: AnyCodable?
+    public let id: String
+    public let text: String
+    public let author: TweetAuthor
+    public let authorId: String?
+    public let createdAt: String?
+    public let replyCount: Int?
+    public let retweetCount: Int?
+    public let likeCount: Int?
+    public let conversationId: String?
+    public let inReplyToStatusId: String?
+    public let quotedTweet: TweetData?
+    public let media: [TweetMedia]?
+    public let article: TweetArticle?
+    public let _raw: AnyCodable?
 
     public init(
         id: String,
@@ -75,14 +75,31 @@ public final class TweetData: Codable, Sendable {
         self.article = article
         self._raw = _raw
     }
+
+    public func replacingText(_ text: String) -> TweetData {
+        TweetData(id: id, text: text, author: author, authorId: authorId, createdAt: createdAt,
+                  replyCount: replyCount, retweetCount: retweetCount, likeCount: likeCount,
+                  conversationId: conversationId, inReplyToStatusId: inReplyToStatusId,
+                  quotedTweet: quotedTweet, media: media, article: article, _raw: _raw)
+    }
 }
 
 public struct TwitterUser: Codable, Sendable {
     public var id: String
     public var username: String
     public var name: String?
-    public init(id: String, username: String, name: String? = nil) {
+    public var description: String?
+    public var followersCount: Int?
+    public var followingCount: Int?
+    public var isBlueVerified: Bool?
+    public var profileImageUrl: String?
+    public var createdAt: String?
+    public init(id: String, username: String, name: String? = nil, description: String? = nil,
+                followersCount: Int? = nil, followingCount: Int? = nil, isBlueVerified: Bool? = nil,
+                profileImageUrl: String? = nil, createdAt: String? = nil) {
         self.id = id; self.username = username; self.name = name
+        self.description = description; self.followersCount = followersCount; self.followingCount = followingCount
+        self.isBlueVerified = isBlueVerified; self.profileImageUrl = profileImageUrl; self.createdAt = createdAt
     }
 }
 
@@ -184,6 +201,6 @@ public func extractTweetId(_ input: String) -> String {
 
 public func normalizeHandle(_ raw: String) -> String? {
     var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    if s.hasPrefix("@") { s = String(s.dropFirst()) }
-    return s.isEmpty ? nil : s
+    if s.hasPrefix("@") { s = String(s.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) }
+    return s.range(of: #"^[A-Za-z0-9_]{1,15}$"#, options: .regularExpression) == nil ? nil : s
 }

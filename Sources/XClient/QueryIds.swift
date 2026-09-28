@@ -10,6 +10,7 @@ public let fallbackQueryIds: [String: String] = [
     "UnfavoriteTweet": "ZYKSe-w7KEslx3JhSIk5LA",
     "CreateBookmark": "aoDbu3RHznuiSkQ9aNM67Q",
     "DeleteBookmark": "Wlmlj2-xzyS1GN3a6cj-mQ",
+    "UserByScreenName": "xc8f1g7BYqr6VTzTbvNlGw",
     "TweetDetail": "97JF30KziU00483E_8elBA",
     "SearchTimeline": "M1jEez78PEfVfbQLvlWMvQ",
     "UserArticlesTweets": "8zBy9h4L90aDL02RsBcCFg",
@@ -59,23 +60,36 @@ public actor QueryIdStore {
     public static let shared = QueryIdStore()
     private var memory: QueryIdSnapshot?
     private var baked: [String: String] = bakedQueryIds()
+    private let explicitCachePath: String?
+    private let explicitLegacyPath: String?
+    private let allowRefresh: Bool?
+    private var refreshTask: Task<Void, Never>?
+
+    public init(cachePath: String? = nil, legacyCachePath: String? = nil, allowRefresh: Bool? = nil) {
+        self.explicitCachePath = cachePath
+        self.explicitLegacyPath = legacyCachePath
+        self.allowRefresh = allowRefresh
+    }
 
     public func cachePath() -> String {
-        if let env = ProcessInfo.processInfo.environment["BIRD_QUERY_IDS_CACHE"], !env.isEmpty {
-            return env
-        }
-        let base: String
-        if let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"], !xdg.isEmpty {
-            base = "\(xdg)/bird"
-        } else {
-            base = "\(FileManager.default.homeDirectoryForCurrentUser.path)/.config/bird"
-        }
-        return "\(base)/query-ids-cache.json"
+        explicitCachePath ?? ClientFeatures.nonempty(ProcessInfo.processInfo.environment["AVIARY_QUERY_IDS_CACHE"])
+            ?? "\(ClientFeatures.configRoot())/aviary/query-ids-cache.json"
+    }
+
+    private func legacyPath() -> String {
+        explicitLegacyPath ?? ClientFeatures.nonempty(ProcessInfo.processInfo.environment["BIRD_QUERY_IDS_CACHE"])
+            ?? "\(ClientFeatures.configRoot())/bird/query-ids-cache.json"
+    }
+
+    private func readSnapshot(_ path: String) -> QueryIdSnapshot? {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+        return try? JSONDecoder().decode(QueryIdSnapshot.self, from: data)
     }
 
     public func getQueryId(_ name: String) -> String {
         if let mem = memory?.ids[name] { return mem }
         if let disk = loadDisk()?.ids[name] { return disk }
+        if let legacy = readSnapshot(legacyPath())?.ids[name] { return legacy }
         return baked[name] ?? fallbackQueryIds[name] ?? ""
     }
 
@@ -86,14 +100,29 @@ public actor QueryIdStore {
         return (snap, path, age, age < snap.ttlMs)
     }
 
-    public func loadDisk() -> QueryIdSnapshot? {
-        let path = cachePath()
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
-        return try? JSONDecoder().decode(QueryIdSnapshot.self, from: data)
+    public func loadDisk() -> QueryIdSnapshot? { readSnapshot(cachePath()) }
+
+    public func cliStatus() -> AnyCodable {
+        var status: [String: Any] = ["cached": false, "cachePath": cachePath(), "featuresPath": ClientFeatures.cachePath(), "features": ClientFeatures.overrides()]
+        if let info = snapshotInfo() {
+            status["cached"] = true
+            status["fetchedAt"] = info.snapshot.fetchedAt
+            status["isFresh"] = info.isFresh
+            status["ageMs"] = info.ageMs
+            status["ids"] = info.snapshot.ids
+            status["discovery"] = ["pages": info.snapshot.discovery.pages, "bundles": info.snapshot.discovery.bundles]
+        }
+        return rawJSON(status) ?? AnyCodable(.null)
+    }
+
+    public func refreshCLI(session: HTTPSession = URLSessionHTTP()) async {
+        await refresh(force: true, session: session)
+        try? ClientFeatures.refresh()
     }
 
     public func queryIdsForCLI() -> [String: String] {
         var ids = baked
+        if let legacy = readSnapshot(legacyPath()) { ids.merge(legacy.ids) { _, new in new } }
         if let snap = loadDisk() ?? memory {
             for (k, v) in snap.ids { ids[k] = v }
         }
@@ -102,6 +131,14 @@ public actor QueryIdStore {
 
     public func refresh(force: Bool, session: HTTPSession) async {
         if skipRefresh() { return }
+        if let task = refreshTask { await task.value; return }
+        let task = Task { await self.discover(force: force, session: session) }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func discover(force: Bool, session: HTTPSession) async {
         if !force, let snap = loadDisk(), ageMs(snap) < snap.ttlMs {
             memory = snap
             return
@@ -130,7 +167,7 @@ public actor QueryIdStore {
                 }
             }
         }
-        bundles = Array(Set(bundles))
+        bundles = uniqueStrings(bundles)
         for bundle in bundles {
             guard let url = URL(string: bundle),
                   let (data, _) = try? await session.data(for: URLRequest(url: url)),
@@ -151,17 +188,21 @@ public actor QueryIdStore {
             withIntermediateDirectories: true
         )
         if let data = try? JSONEncoder().encode(snap) {
-            try? data.write(to: URL(fileURLWithPath: path))
+            try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 
     private func ageMs(_ snap: QueryIdSnapshot) -> Int {
         let f = ISO8601DateFormatter()
-        guard let d = f.date(from: snap.fetchedAt) else { return Int.max }
-        return Int(Date().timeIntervalSince(d) * 1000)
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fractional = f.date(from: snap.fetchedAt)
+        f.formatOptions = [.withInternetDateTime]
+        guard let d = fractional ?? f.date(from: snap.fetchedAt) else { return Int.max }
+        return max(0, Int(Date().timeIntervalSince(d) * 1000))
     }
 
     private func skipRefresh() -> Bool {
+        if let allowRefresh { return !allowRefresh }
         let env = ProcessInfo.processInfo.environment
         if env["AVIARY_SKIP_QUERY_ID_REFRESH"] == "1" { return true }
         if env["XCTestConfigurationFilePath"] != nil { return true }
@@ -169,18 +210,20 @@ public actor QueryIdStore {
     }
 
     private func extractOps(_ js: String, into found: inout [String: String]) {
+        // Match both property orders, but never cross an object boundary. A broad
+        // scan can otherwise pair one operation's name with the next one's ID.
         let patterns: [(String, Int, Int)] = [
-            (#"e\.exports=\{queryId\s*:\s*[\"']([^\"']+)[\"']\s*,\s*operationName\s*:\s*[\"']([^\"']+)[\"']"#, 2, 1),
-            (#"e\.exports=\{operationName\s*:\s*[\"']([^\"']+)[\"']\s*,\s*queryId\s*:\s*[\"']([^\"']+)[\"']"#, 1, 2),
+            (#"operationName\s*[:=]\s*[\"']([^\"']+)[\"']([^{}]{0,4000}?)queryId\s*[:=]\s*[\"']([^\"']+)[\"']"#, 1, 3),
+            (#"queryId\s*[:=]\s*[\"']([^\"']+)[\"']([^{}]{0,4000}?)operationName\s*[:=]\s*[\"']([^\"']+)[\"']"#, 3, 1),
         ]
+        let ns = js as NSString
         for (pat, opG, idG) in patterns {
             guard let re = try? NSRegularExpression(pattern: pat) else { continue }
-            let ns = js as NSString
             re.enumerateMatches(in: js, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
                 guard let m else { return }
                 let op = ns.substring(with: m.range(at: opG))
                 let qid = ns.substring(with: m.range(at: idG))
-                if fallbackQueryIds.keys.contains(op) {
+                if fallbackQueryIds.keys.contains(op), found[op] == nil, qid.range(of: #"^[a-zA-Z0-9_-]+$"#, options: .regularExpression) != nil {
                     found[op] = qid
                 }
             }

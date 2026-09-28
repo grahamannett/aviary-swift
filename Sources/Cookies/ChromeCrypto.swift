@@ -85,14 +85,17 @@ enum ChromeCrypto {
         return removePkcs7(out)
     }
 
-    private static func removePkcs7(_ value: Data) -> Data {
-        guard let pad = value.last, pad > 0, pad <= 16, value.count >= Int(pad) else { return value }
+    private static func removePkcs7(_ value: Data) -> Data? {
+        guard let pad = value.last, pad > 0, pad <= 16, value.count >= Int(pad),
+              value.suffix(Int(pad)).allSatisfy({ $0 == pad }) else { return nil }
         return Data(value.dropLast(Int(pad)))
     }
 
     private static func decodeValue(_ value: Data, stripHashPrefix: Bool) -> String? {
-        let bytes = stripHashPrefix && value.count >= 32 ? value.dropFirst(32) : value[...]
-        return String(data: Data(bytes), encoding: .utf8)
+        guard !stripHashPrefix || value.count >= 32 else { return nil }
+        let bytes = stripHashPrefix ? value.dropFirst(32) : value[...]
+        guard let decoded = String(data: bytes, encoding: .utf8) else { return nil }
+        return String(decoded.drop(while: { $0.unicodeScalars.allSatisfy { $0.value < 0x20 } }))
     }
 
     static func pbkdf2SHA1(password: String, salt: Data, iterations: UInt32, keyLength: Int) -> Data {

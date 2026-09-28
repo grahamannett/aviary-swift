@@ -55,7 +55,10 @@ public struct TwitterCookies: Sendable {
         self.warnings = warnings
     }
 
-    public var isComplete: Bool { authToken != nil && ct0 != nil }
+    public var isComplete: Bool {
+        guard let authToken, let ct0 else { return false }
+        return !authToken.isEmpty && !ct0.isEmpty
+    }
 }
 
 public func hostMatchesCookieDomain(host: String, cookieDomain: String) -> Bool {

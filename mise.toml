@@ -35,23 +35,15 @@ alias = "b"
 
 [tasks.test]
 description = "Run unit tests"
-run = """
-swift build --product AviarySelfTest
-BIN="$(swift build --product AviarySelfTest --show-bin-path)/AviarySelfTest"
-"$BIN"
-"""
+run = "swift test"
 alias = "t"
 
 [tasks.test-filter]
-description = "Run tests matching a XCTest/Swift Testing filter"
+description = "Run tests matching an XCTest filter"
 usage = """
 arg "<filter>" help="Test name filter passed to swift test --filter"
 """
-run = """
-swift build --product AviarySelfTest
-BIN="$(swift build --product AviarySelfTest --show-bin-path)/AviarySelfTest"
-"$BIN"
-"""
+run = 'swift test --filter "${usage_filter}"'
 
 [tasks.run]
 description = "Debug-build then run aviary with extra args (from caller cwd)"

@@ -47,5 +47,8 @@ let package = Package(
             name: "AviarySelfTest",
             dependencies: ["Cookies", "XClient", "AviaryCLI"]
         ),
+        .testTarget(name: "CookiesTests", dependencies: ["Cookies"]),
+        .testTarget(name: "XClientTests", dependencies: ["XClient", "Cookies"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "AviaryCLITests", dependencies: ["AviaryCLI", "XClient", "Cookies"], resources: [.copy("Fixtures")]),
     ]
 )

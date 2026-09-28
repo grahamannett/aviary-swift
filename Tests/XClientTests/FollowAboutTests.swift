@@ -1,5 +1,4 @@
-import Darwin
-import Testing
+import XCTest
 import Cookies
 import XClient
 import Foundation
@@ -13,20 +12,80 @@ final class MockSession: HTTPSession, @unchecked Sendable {
     }
 }
 
-@Suite struct FollowAboutTests {
-    @Test func followCode160() async {
+final class FollowAboutTests: XCTestCase {
+    private func client(session: MockSession) -> TwitterClient {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("aviary-follow-tests-\(UUID().uuidString)")
+        let store = QueryIdStore(
+            cachePath: directory.appendingPathComponent("queries.json").path,
+            legacyCachePath: directory.appendingPathComponent("legacy.json").path,
+            allowRefresh: false
+        )
+        return TwitterClient(cookies: TwitterCookies(authToken: "a", ct0: "c", cookieHeader: "auth_token=a; ct0=c"),
+                             session: session, queryIdStore: store)
+    }
+
+    func testFollowCode160() async {
         let session = MockSession { req in
             let json = #"{"errors":[{"code":160,"message":"already"}]}"#
             let url = req.url ?? URL(string: "https://x.com")!
             return (Data(json.utf8), HTTPURLResponse(url: url, statusCode: 403, httpVersion: nil, headerFields: nil)!)
         }
-        let cookies = TwitterCookies(authToken: "a", ct0: "c", cookieHeader: "auth_token=a; ct0=c")
-        let client = TwitterClient(cookies: cookies, session: session)
+        let client = client(session: session)
         let r = await client.follow("123")
-        #expect(r.success)
+        XCTAssertTrue(r.success)
     }
 
-    @Test func aboutMapping() async {
+    func testFriendshipFailuresDoNotRetryMutation() async {
+        let responses = [
+            (429, #"{"errors":[{"message":"Rate limited"}]}"#),
+            (503, "unavailable"),
+            (200, "invalid JSON"),
+            (200, "{}"),
+            (200, #"{"errors":[{"message":"Rejected","code":32}]}"#),
+            (404, #"{"errors":[{"message":"User not found","code":108}]}"#),
+        ]
+        for follow in [false, true] {
+            for response in responses {
+                let session = ClientMockSession { _, _ in response }
+                let client = ClientParityTests.makeClient(session)
+                let result = follow ? await client.follow("123") : await client.unfollow("123")
+                XCTAssertFalse(result.success)
+                XCTAssertNotNil(result.error)
+                let requests = await session.recorded()
+                XCTAssertEqual(requests.count, 1)
+            }
+            let session = ClientMockSession { _, _ in throw URLError(.timedOut) }
+            let client = ClientParityTests.makeClient(session)
+            let result = follow ? await client.follow("123") : await client.unfollow("123")
+            XCTAssertFalse(result.success)
+            let requests = await session.recorded()
+            XCTAssertEqual(requests.count, 1)
+        }
+    }
+
+    func testFriendshipFallbackRequiresMissingEndpoint() async {
+        for follow in [false, true] {
+            for missingEndpoints in [1, 2] {
+                let session = ClientMockSession { request, index in
+                    if index <= missingEndpoints { return (404, "not found") }
+                    if request.url!.path.contains("/graphql/") {
+                        return (200, #"{"data":{"user":{"result":{"rest_id":"123","legacy":{"screen_name":"person","name":"Person"}}}}}"#)
+                    }
+                    return (200, #"{"id_str":"123","screen_name":"person"}"#)
+                }
+                let client = ClientParityTests.makeClient(session)
+                let result = follow ? await client.follow("123") : await client.unfollow("123")
+                XCTAssertTrue(result.success)
+                XCTAssertEqual(result.userId, "123")
+                XCTAssertEqual(result.username, "person")
+                let requests = await session.recorded()
+                XCTAssertEqual(requests.count, missingEndpoints + 1)
+                XCTAssertEqual(requests.last?.url?.host, missingEndpoints == 1 ? "api.twitter.com" : "x.com")
+            }
+        }
+    }
+
+    func testAboutMapping() async {
         let body = """
         {"data":{"user_result_by_screen_name":{"result":{"about_profile":{
           "account_based_in":"US","source":"ip","created_country_accurate":true,
@@ -37,12 +96,10 @@ final class MockSession: HTTPSession, @unchecked Sendable {
             let url = req.url ?? URL(string: "https://x.com")!
             return (Data(body.utf8), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
-        let cookies = TwitterCookies(authToken: "a", ct0: "c", cookieHeader: "auth_token=a; ct0=c")
-        let client = TwitterClient(cookies: cookies, session: session)
-        setenv("AVIARY_SKIP_QUERY_ID_REFRESH", "1", 1)
+        let client = client(session: session)
         let r = await client.getUserAboutAccount("someone")
-        #expect(r.success)
-        #expect(r.about?.accountBasedIn == "US")
-        #expect(r.about?.learnMoreUrl == "https://x.com/i/about")
+        XCTAssertTrue(r.success)
+        XCTAssertTrue(r.about?.accountBasedIn == "US")
+        XCTAssertTrue(r.about?.learnMoreUrl == "https://x.com/i/about")
     }
 }

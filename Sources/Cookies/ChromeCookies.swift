@@ -5,72 +5,26 @@ enum ChromeCookies {
         origins: [URL],
         names: Set<String>,
         profile: String?,
-        timeoutMs: Int?
-    ) -> (cookies: [Cookie], warnings: [String]) {
-        var warnings: [String] = []
-        let profiles: [String?]
-        if let profile, !profile.isEmpty {
-            profiles = [profile]
-        } else {
-            let listed = listChromeProfileCandidates()
-            profiles = listed.isEmpty ? [nil] : listed.map { Optional($0) }
-        }
-        for candidate in profiles {
-            let (cookies, w) = loadOnce(origins: origins, names: names, profile: candidate, timeoutMs: timeoutMs)
-            warnings.append(contentsOf: w)
-            if cookies.contains(where: { $0.name == "auth_token" }) && cookies.contains(where: { $0.name == "ct0" }) {
-                return (cookies, warnings)
-            }
-        }
-        return ([], warnings)
-    }
-
-    static func listChromeProfileCandidates() -> [String] {
-        var names: [String] = []
-        var seen = Set<String>()
-        func add(_ name: String) {
-            if !name.isEmpty, seen.insert(name).inserted { names.append(name) }
-        }
-        for root in chromeRoots() {
-            let url = URL(fileURLWithPath: root).appendingPathComponent("Local State")
-            if let data = try? Data(contentsOf: url),
-               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let profile = obj["profile"] as? [String: Any]
-            {
-                if let last = profile["last_used"] as? String { add(last) }
-                if let active = profile["last_active_profiles"] as? [String] { active.forEach(add) }
-                if let cache = profile["info_cache"] as? [String: Any] { cache.keys.forEach(add) }
-            }
-            if let entries = try? FileManager.default.contentsOfDirectory(atPath: root) {
-                for entry in entries where entry == "Default" || entry.hasPrefix("Profile ") {
-                    add(entry)
-                }
-            }
-        }
-        return names.filter { name in
-            chromeRoots().contains { root in
-                let base = "\(root)/\(name)"
-                return FileManager.default.fileExists(atPath: "\(base)/Cookies")
-                    || FileManager.default.fileExists(atPath: "\(base)/Network/Cookies")
-            }
-        }
-    }
-
-    private static func loadOnce(
-        origins: [URL],
-        names: Set<String>,
-        profile: String?,
-        timeoutMs: Int?
+        timeoutMs: Double?,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        roots: [String]? = nil,
+        passwordReader: ((String, Double?) -> Result<String, NSError>)? = nil,
+        now: Int = Int(Date().timeIntervalSince1970)
     ) -> (cookies: [Cookie], warnings: [String]) {
         #if os(Windows)
         return WindowsChrome.load(origins: origins, names: names, profile: profile)
         #else
-        guard let dbPath = resolveCookiesDb(profile: profile) else {
+        guard let dbPath = resolveCookiesDb(profile: profile, roots: roots) else {
             return ([], ["Chrome cookies database not found."])
         }
         let keychain = keychainFor(dbPath: dbPath)
         let password: String
-        if let envName = envOverride(for: dbPath), let env = ProcessInfo.processInfo.environment[envName], !env.isEmpty {
+        if let reader = passwordReader {
+            switch reader(dbPath, timeoutMs) {
+            case .success(let value): password = value
+            case .failure(let error): return ([], ["Failed to read macOS Keychain (\(keychain.label)): \(error.localizedDescription)"])
+            }
+        } else if let envName = envOverride(for: dbPath), let env = normalizedEnvironmentValue(environment[envName]) {
             password = env
         } else {
             #if os(macOS)
@@ -86,6 +40,11 @@ enum ChromeCookies {
             return ([], ["Chrome cookie extraction is not supported on this platform."])
             #endif
         }
+        #if os(macOS)
+        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return ([], ["macOS Keychain returned an empty \(keychain.label) password."])
+        }
+        #endif
         #if os(Linux)
         let keys = [
             ChromeCrypto.deriveAes128CbcKey(password: password, iterations: 1),
@@ -98,46 +57,44 @@ enum ChromeCookies {
         do {
             let tmp = try SqliteHelper.copyDbWithSidecars(from: dbPath)
             defer { try? FileManager.default.removeItem(at: tmp.deletingLastPathComponent()) }
-            let metaRows = SqliteHelper.query(tmp.path, sql: "SELECT value FROM meta WHERE key = 'version'")
+            let metaRows = (try? SqliteHelper.query(tmp.path, sql: "SELECT value FROM meta WHERE key = 'version'")) ?? []
             let metaVersion = (metaRows.first?["value"] as? String).flatMap(Int.init)
                 ?? (metaRows.first?["value"] as? Int64).map(Int.init)
                 ?? 0
             let stripHash = metaVersion >= 24
             let hosts = origins.compactMap { $0.host }
-            let rows = SqliteHelper.query(
+            let rows = try SqliteHelper.query(
                 tmp.path,
-                sql: "SELECT name, value, host_key, path, expires_utc, is_secure, is_httponly, encrypted_value FROM cookies"
+                sql: "SELECT name, value, host_key, path, expires_utc, is_secure, is_httponly, encrypted_value FROM cookies ORDER BY expires_utc DESC"
             )
-            let now = Int(Date().timeIntervalSince1970)
             var cookies: [Cookie] = []
             for row in rows {
-                guard let name = row["name"] as? String else { continue }
+                guard let name = row["name"] as? String, !name.isEmpty else { continue }
                 if !names.isEmpty && !names.contains(name) { continue }
                 guard let hostKey = row["host_key"] as? String else { continue }
                 if !hosts.contains(where: { hostMatchesCookieDomain(host: $0, cookieDomain: hostKey) }) { continue }
                 var value = row["value"] as? String
                 if value == nil || value?.isEmpty == true {
-                    if let blob = row["encrypted_value"] as? Data {
-                        value = ChromeCrypto.decryptAes128Cbc(encryptedValue: blob, keys: keys, stripHashPrefix: stripHash)
-                    }
+                    guard let blob = row["encrypted_value"] as? Data else { continue }
+                    value = ChromeCrypto.decryptAes128Cbc(encryptedValue: blob, keys: keys, stripHashPrefix: stripHash)
                 }
-                guard let value, !value.isEmpty else { continue }
+                guard let value else { continue }
                 if let exp = chromeExpiry(row["expires_utc"]), exp < now { continue }
                 cookies.append(
                     Cookie(
                         name: name,
                         value: value,
                         domain: hostKey.hasPrefix(".") ? String(hostKey.dropFirst()) : hostKey,
-                        path: (row["path"] as? String) ?? "/",
+                        path: (row["path"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "/",
                         expires: chromeExpiry(row["expires_utc"]),
                         secure: intFlag(row["is_secure"]),
                         httpOnly: intFlag(row["is_httponly"])
                     )
                 )
             }
-            return (cookies, [])
+            return (deduplicateCookies(cookies), [])
         } catch {
-            return ([], ["Failed to copy Chrome cookie DB: \(error.localizedDescription)"])
+            return ([], ["Failed to read Chrome cookies: \(error.localizedDescription)"])
         }
         #endif
     }
@@ -163,11 +120,10 @@ enum ChromeCookies {
         #if os(macOS)
         return [
             "\(home)/Library/Application Support/Google/Chrome",
-            "\(home)/Library/Application Support/BraveSoftware/Brave-Browser",
         ]
         #elseif os(Linux)
         let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"] ?? "\(home)/.config"
-        return ["\(xdg)/google-chrome", "\(xdg)/BraveSoftware/Brave-Browser"]
+        return ["\(xdg)/google-chrome"]
         #elseif os(Windows)
         let local = ProcessInfo.processInfo.environment["LOCALAPPDATA"] ?? ""
         return ["\(local)\\Google\\Chrome\\User Data"]
@@ -176,7 +132,7 @@ enum ChromeCookies {
         #endif
     }
 
-    static func resolveCookiesDb(profile: String?) -> String? {
+    static func resolveCookiesDb(profile: String?, roots: [String]? = nil) -> String? {
         if let profile, profile.contains("/") || profile.contains("\\") {
             let expanded = (profile as NSString).expandingTildeInPath
             var isDir: ObjCBool = false
@@ -187,9 +143,10 @@ enum ChromeCookies {
                     if FileManager.default.fileExists(atPath: p) { return p }
                 }
             }
+            return nil
         }
-        let profileDir = (profile?.isEmpty == false) ? profile! : "Default"
-        for root in chromeRoots() {
+        let profileDir = normalizedEnvironmentValue(profile) ?? "Default"
+        for root in roots ?? chromeRoots() {
             for extra in ["Cookies", "Network/Cookies"] {
                 let p = "\(root)/\(profileDir)/\(extra)"
                 if FileManager.default.fileExists(atPath: p) { return p }
@@ -213,7 +170,7 @@ enum ChromeCookies {
     }
 
     #if os(macOS)
-    private static func readKeychain(account: String, service: String, timeoutMs: Int) -> Result<String, NSError> {
+    private static func readKeychain(account: String, service: String, timeoutMs: Double) -> Result<String, NSError> {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
         proc.arguments = ["find-generic-password", "-w", "-a", account, "-s", service]

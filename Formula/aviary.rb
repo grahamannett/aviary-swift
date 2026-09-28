@@ -10,6 +10,7 @@ class Aviary < Formula
     system "swift", "build", "-c", "release", "--product", "aviary", "--disable-sandbox"
     bin_path = `swift build -c release --product aviary --show-bin-path`.strip
     bin.install "#{bin_path}/aviary"
+    doc.install "THIRD_PARTY_NOTICES.md"
   end
 
   test do

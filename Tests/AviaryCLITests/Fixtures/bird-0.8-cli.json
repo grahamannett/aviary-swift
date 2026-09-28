@@ -1,0 +1,2869 @@
+{
+  "reference": "Bird 0.8.0",
+  "globalOptions": [
+    {
+      "flags": "-V, --version",
+      "long": "--version",
+      "short": "-V"
+    },
+    {
+      "flags": "--auth-token <token>",
+      "long": "--auth-token"
+    },
+    {
+      "flags": "--ct0 <token>",
+      "long": "--ct0"
+    },
+    {
+      "flags": "--chrome-profile <name>",
+      "long": "--chrome-profile"
+    },
+    {
+      "flags": "--chrome-profile-dir <path>",
+      "long": "--chrome-profile-dir"
+    },
+    {
+      "flags": "--firefox-profile <name>",
+      "long": "--firefox-profile"
+    },
+    {
+      "flags": "--cookie-timeout <ms>",
+      "long": "--cookie-timeout"
+    },
+    {
+      "flags": "--cookie-source <source>",
+      "long": "--cookie-source"
+    },
+    {
+      "flags": "--media <path>",
+      "long": "--media"
+    },
+    {
+      "flags": "--alt <text>",
+      "long": "--alt"
+    },
+    {
+      "flags": "--timeout <ms>",
+      "long": "--timeout"
+    },
+    {
+      "flags": "--quote-depth <depth>",
+      "long": "--quote-depth"
+    },
+    {
+      "flags": "--plain",
+      "long": "--plain"
+    },
+    {
+      "flags": "--no-emoji",
+      "long": "--no-emoji"
+    },
+    {
+      "flags": "--no-color",
+      "long": "--no-color"
+    }
+  ],
+  "commands": [
+    {
+      "name": "help",
+      "aliases": [],
+      "options": [],
+      "arguments": [
+        {
+          "name": "command",
+          "required": false,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "query-ids",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--fresh",
+          "long": "--fresh",
+          "default": false
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "tweet",
+      "aliases": [],
+      "options": [],
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "reply",
+      "aliases": [],
+      "options": [],
+      "arguments": [
+        {
+          "name": "tweet-id-or-url",
+          "required": true,
+          "variadic": false
+        },
+        {
+          "name": "text",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "read",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "tweet-id-or-url",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "replies",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--delay <ms>",
+          "long": "--delay",
+          "default": "1000"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "tweet-id-or-url",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "thread",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--delay <ms>",
+          "long": "--delay",
+          "default": "1000"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "tweet-id-or-url",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "search",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "10"
+        },
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "query",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "mentions",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-u, --user <handle>",
+          "long": "--user",
+          "short": "-u"
+        },
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "10"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "bookmarks",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--folder-id <id>",
+          "long": "--folder-id"
+        },
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--expand-root-only",
+          "long": "--expand-root-only"
+        },
+        {
+          "flags": "--author-chain",
+          "long": "--author-chain"
+        },
+        {
+          "flags": "--author-only",
+          "long": "--author-only"
+        },
+        {
+          "flags": "--full-chain-only",
+          "long": "--full-chain-only"
+        },
+        {
+          "flags": "--include-ancestor-branches",
+          "long": "--include-ancestor-branches"
+        },
+        {
+          "flags": "--include-parent",
+          "long": "--include-parent"
+        },
+        {
+          "flags": "--thread-meta",
+          "long": "--thread-meta"
+        },
+        {
+          "flags": "--sort-chronological",
+          "long": "--sort-chronological"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "unbookmark",
+      "aliases": [],
+      "options": [],
+      "arguments": [
+        {
+          "name": "tweet-id-or-url",
+          "required": true,
+          "variadic": true
+        }
+      ]
+    },
+    {
+      "name": "follow",
+      "aliases": [],
+      "options": [],
+      "arguments": [
+        {
+          "name": "username-or-id",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "unfollow",
+      "aliases": [],
+      "options": [],
+      "arguments": [
+        {
+          "name": "username-or-id",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "lists",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--member-of",
+          "long": "--member-of"
+        },
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "100"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "list-timeline",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "list-id-or-url",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "home",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--following",
+          "long": "--following"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "following",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--user <userId>",
+          "long": "--user"
+        },
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--cursor <cursor>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "followers",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--user <userId>",
+          "long": "--user"
+        },
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--cursor <cursor>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "likes",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--all",
+          "long": "--all"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "whoami",
+      "aliases": [],
+      "options": [],
+      "arguments": []
+    },
+    {
+      "name": "about",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "--json",
+          "long": "--json"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "username",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "user-tweets",
+      "aliases": [],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "20"
+        },
+        {
+          "flags": "--max-pages <number>",
+          "long": "--max-pages"
+        },
+        {
+          "flags": "--delay <ms>",
+          "long": "--delay",
+          "default": "1000"
+        },
+        {
+          "flags": "--cursor <string>",
+          "long": "--cursor"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": [
+        {
+          "name": "handle",
+          "required": true,
+          "variadic": false
+        }
+      ]
+    },
+    {
+      "name": "news",
+      "aliases": [
+        "trending"
+      ],
+      "options": [
+        {
+          "flags": "-n, --count <number>",
+          "long": "--count",
+          "short": "-n",
+          "default": "10"
+        },
+        {
+          "flags": "--ai-only",
+          "long": "--ai-only"
+        },
+        {
+          "flags": "--with-tweets",
+          "long": "--with-tweets"
+        },
+        {
+          "flags": "--tweets-per-item <number>",
+          "long": "--tweets-per-item",
+          "default": "5"
+        },
+        {
+          "flags": "--for-you",
+          "long": "--for-you"
+        },
+        {
+          "flags": "--news-only",
+          "long": "--news-only"
+        },
+        {
+          "flags": "--sports",
+          "long": "--sports"
+        },
+        {
+          "flags": "--entertainment",
+          "long": "--entertainment"
+        },
+        {
+          "flags": "--trending-only",
+          "long": "--trending-only"
+        },
+        {
+          "flags": "--json",
+          "long": "--json"
+        },
+        {
+          "flags": "--json-full",
+          "long": "--json-full"
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "name": "check",
+      "aliases": [],
+      "options": [],
+      "arguments": []
+    }
+  ],
+  "rendering": [
+    {
+      "name": "ordinary",
+      "mode": "normal",
+      "tweet": {
+        "id": "ordinary",
+        "text": "Hello",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "ordinary",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nHello\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/ordinary\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "quote",
+      "mode": "normal",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ]
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n┌─ QT @alice:\n│ Quoted tweet\n│ with a second line\n│ 🖼️ https://example.invalid/photo.jpg\n└─ https://x.com/alice/status/quote\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/main\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "quote-disabled",
+      "mode": "normal",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/main\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "nested-raw",
+      "mode": "normal",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "quotedTweet": {
+            "id": "nested",
+            "text": "Nested quote",
+            "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+            "replyCount": 2,
+            "retweetCount": 3,
+            "likeCount": 4,
+            "conversationId": "nested",
+            "author": {
+              "username": "alice",
+              "name": "Alice"
+            },
+            "authorId": "author-1",
+            "_raw": {
+              "rest_id": "nested",
+              "core": {
+                "user_results": {
+                  "result": {
+                    "rest_id": "author-1",
+                    "legacy": {
+                      "screen_name": "alice",
+                      "name": "Alice"
+                    }
+                  }
+                }
+              },
+              "legacy": {
+                "full_text": "Nested quote",
+                "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                "reply_count": 2,
+                "retweet_count": 3,
+                "favorite_count": 4,
+                "conversation_id_str": "nested"
+              }
+            }
+          },
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ],
+          "_raw": {
+            "rest_id": "quote",
+            "core": {
+              "user_results": {
+                "result": {
+                  "rest_id": "author-1",
+                  "legacy": {
+                    "screen_name": "alice",
+                    "name": "Alice"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "full_text": "Quoted tweet\nwith a second line",
+              "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+              "reply_count": 2,
+              "retweet_count": 3,
+              "favorite_count": 4,
+              "conversation_id_str": "quote",
+              "extended_entities": {
+                "media": [
+                  {
+                    "type": "photo",
+                    "media_url_https": "https://example.invalid/photo.jpg",
+                    "sizes": {
+                      "large": {
+                        "w": 1200,
+                        "h": 800
+                      },
+                      "small": {
+                        "w": 300,
+                        "h": 200
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "quoted_status_result": {
+              "result": {
+                "rest_id": "nested",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Nested quote",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "nested"
+                }
+              }
+            }
+          }
+        },
+        "_raw": {
+          "rest_id": "main",
+          "core": {
+            "user_results": {
+              "result": {
+                "rest_id": "author-1",
+                "legacy": {
+                  "screen_name": "alice",
+                  "name": "Alice"
+                }
+              }
+            }
+          },
+          "legacy": {
+            "full_text": " Main tweet ",
+            "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+            "reply_count": 2,
+            "retweet_count": 3,
+            "favorite_count": 4,
+            "conversation_id_str": "main"
+          },
+          "quoted_status_result": {
+            "result": {
+              "tweet": {
+                "rest_id": "quote",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Quoted tweet\nwith a second line",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "quote",
+                  "extended_entities": {
+                    "media": [
+                      {
+                        "type": "photo",
+                        "media_url_https": "https://example.invalid/photo.jpg",
+                        "sizes": {
+                          "large": {
+                            "w": 1200,
+                            "h": 800
+                          },
+                          "small": {
+                            "w": 300,
+                            "h": 200
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "quoted_status_result": {
+                  "result": {
+                    "rest_id": "nested",
+                    "core": {
+                      "user_results": {
+                        "result": {
+                          "rest_id": "author-1",
+                          "legacy": {
+                            "screen_name": "alice",
+                            "name": "Alice"
+                          }
+                        }
+                      }
+                    },
+                    "legacy": {
+                      "full_text": "Nested quote",
+                      "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                      "reply_count": 2,
+                      "retweet_count": 3,
+                      "favorite_count": 4,
+                      "conversation_id_str": "nested"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n┌─ QT @alice:\n│ Quoted tweet\n│ with a second line\n│ 🖼️ https://example.invalid/photo.jpg\n└─ https://x.com/alice/status/quote\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/main\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "article",
+      "mode": "normal",
+      "tweet": {
+        "id": "article",
+        "text": "# A title\n\nA full article body",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "A title",
+          "previewText": "Preview"
+        }
+      },
+      "expected": "\n@alice (Alice):\n📰 A title\n   Preview\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/article\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "plain-article",
+      "mode": "normal",
+      "tweet": {
+        "id": "plain-article",
+        "text": "Article title\n\nThe full body.",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "plain-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Article title"
+        }
+      },
+      "expected": "\n@alice (Alice):\n📰 Article title\n\nThe full body.\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/plain-article\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "long-note",
+      "mode": "normal",
+      "tweet": {
+        "id": "note",
+        "text": "Complete long text",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "note",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nComplete long text\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/note\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "video",
+      "mode": "normal",
+      "tweet": {
+        "id": "video",
+        "text": "Video",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "video",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "video",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small",
+            "videoUrl": "https://example.invalid/high.mp4",
+            "durationMs": 1500
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nVideo\n🎬 https://example.invalid/photo.jpg\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/video\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "gif",
+      "mode": "normal",
+      "tweet": {
+        "id": "gif",
+        "text": "GIF",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "gif",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "animated_gif",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small",
+            "videoUrl": "https://example.invalid/gif.mp4"
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nGIF\n🔄 https://example.invalid/photo.jpg\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/gif\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "wrapped",
+      "mode": "normal",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ],
+          "_raw": {
+            "rest_id": "quote",
+            "core": {
+              "user_results": {
+                "result": {
+                  "rest_id": "author-1",
+                  "legacy": {
+                    "screen_name": "alice",
+                    "name": "Alice"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "full_text": "Quoted tweet\nwith a second line",
+              "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+              "reply_count": 2,
+              "retweet_count": 3,
+              "favorite_count": 4,
+              "conversation_id_str": "quote",
+              "extended_entities": {
+                "media": [
+                  {
+                    "type": "photo",
+                    "media_url_https": "https://example.invalid/photo.jpg",
+                    "sizes": {
+                      "large": {
+                        "w": 1200,
+                        "h": 800
+                      },
+                      "small": {
+                        "w": 300,
+                        "h": 200
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "quoted_status_result": {
+              "result": {
+                "rest_id": "nested",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Nested quote",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "nested"
+                }
+              }
+            }
+          }
+        },
+        "_raw": {
+          "rest_id": "main",
+          "core": {
+            "user_results": {
+              "result": {
+                "rest_id": "author-1",
+                "legacy": {
+                  "screen_name": "alice",
+                  "name": "Alice"
+                }
+              }
+            }
+          },
+          "legacy": {
+            "full_text": " Main tweet ",
+            "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+            "reply_count": 2,
+            "retweet_count": 3,
+            "favorite_count": 4,
+            "conversation_id_str": "main"
+          },
+          "quoted_status_result": {
+            "result": {
+              "tweet": {
+                "rest_id": "quote",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Quoted tweet\nwith a second line",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "quote",
+                  "extended_entities": {
+                    "media": [
+                      {
+                        "type": "photo",
+                        "media_url_https": "https://example.invalid/photo.jpg",
+                        "sizes": {
+                          "large": {
+                            "w": 1200,
+                            "h": 800
+                          },
+                          "small": {
+                            "w": 300,
+                            "h": 200
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "quoted_status_result": {
+                  "result": {
+                    "rest_id": "nested",
+                    "core": {
+                      "user_results": {
+                        "result": {
+                          "rest_id": "author-1",
+                          "legacy": {
+                            "screen_name": "alice",
+                            "name": "Alice"
+                          }
+                        }
+                      }
+                    },
+                    "legacy": {
+                      "full_text": "Nested quote",
+                      "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                      "reply_count": 2,
+                      "retweet_count": 3,
+                      "favorite_count": 4,
+                      "conversation_id_str": "nested"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n┌─ QT @alice:\n│ Quoted tweet\n│ with a second line\n│ 🖼️ https://example.invalid/photo.jpg\n└─ https://x.com/alice/status/quote\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/main\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "empty-name",
+      "mode": "normal",
+      "tweet": {
+        "id": "empty-name",
+        "text": "Text",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "empty-name",
+        "author": {
+          "username": "alice",
+          "name": "alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (alice):\nText\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/empty-name\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "nested-article",
+      "mode": "normal",
+      "tweet": {
+        "id": "nested-article",
+        "text": "Title\n\nNested body",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "nested-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Title"
+        }
+      },
+      "expected": "\n@alice (Alice):\n📰 Title\n\nNested body\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/nested-article\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "ordered-article",
+      "mode": "normal",
+      "tweet": {
+        "id": "ordered-article",
+        "text": "Title\n\nFirst paragraph\n\nSecond paragraph",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "ordered-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Title"
+        }
+      },
+      "expected": "\n@alice (Alice):\n📰 Title\n\nFirst paragraph\n\nSecond paragraph\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/ordered-article\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "video-without-variants",
+      "mode": "normal",
+      "tweet": {
+        "id": "video-without-variants",
+        "text": "Video",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "video-without-variants",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "video",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small"
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nVideo\n🎬 https://example.invalid/photo.jpg\n📅 Tue Sep 22 13:27:42 +0000 2026\n🔗 https://x.com/alice/status/video-without-variants\n❤️ 4  🔁 3  💬 2"
+    },
+    {
+      "name": "ordinary",
+      "mode": "plain",
+      "tweet": {
+        "id": "ordinary",
+        "text": "Hello",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "ordinary",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nHello\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/ordinary\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "quote",
+      "mode": "plain",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ]
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n>  QT @alice:\n> Quoted tweet\n> with a second line\n> PHOTO: https://example.invalid/photo.jpg\n>  https://x.com/alice/status/quote\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/main\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "quote-disabled",
+      "mode": "plain",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/main\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "nested-raw",
+      "mode": "plain",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "quotedTweet": {
+            "id": "nested",
+            "text": "Nested quote",
+            "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+            "replyCount": 2,
+            "retweetCount": 3,
+            "likeCount": 4,
+            "conversationId": "nested",
+            "author": {
+              "username": "alice",
+              "name": "Alice"
+            },
+            "authorId": "author-1",
+            "_raw": {
+              "rest_id": "nested",
+              "core": {
+                "user_results": {
+                  "result": {
+                    "rest_id": "author-1",
+                    "legacy": {
+                      "screen_name": "alice",
+                      "name": "Alice"
+                    }
+                  }
+                }
+              },
+              "legacy": {
+                "full_text": "Nested quote",
+                "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                "reply_count": 2,
+                "retweet_count": 3,
+                "favorite_count": 4,
+                "conversation_id_str": "nested"
+              }
+            }
+          },
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ],
+          "_raw": {
+            "rest_id": "quote",
+            "core": {
+              "user_results": {
+                "result": {
+                  "rest_id": "author-1",
+                  "legacy": {
+                    "screen_name": "alice",
+                    "name": "Alice"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "full_text": "Quoted tweet\nwith a second line",
+              "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+              "reply_count": 2,
+              "retweet_count": 3,
+              "favorite_count": 4,
+              "conversation_id_str": "quote",
+              "extended_entities": {
+                "media": [
+                  {
+                    "type": "photo",
+                    "media_url_https": "https://example.invalid/photo.jpg",
+                    "sizes": {
+                      "large": {
+                        "w": 1200,
+                        "h": 800
+                      },
+                      "small": {
+                        "w": 300,
+                        "h": 200
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "quoted_status_result": {
+              "result": {
+                "rest_id": "nested",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Nested quote",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "nested"
+                }
+              }
+            }
+          }
+        },
+        "_raw": {
+          "rest_id": "main",
+          "core": {
+            "user_results": {
+              "result": {
+                "rest_id": "author-1",
+                "legacy": {
+                  "screen_name": "alice",
+                  "name": "Alice"
+                }
+              }
+            }
+          },
+          "legacy": {
+            "full_text": " Main tweet ",
+            "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+            "reply_count": 2,
+            "retweet_count": 3,
+            "favorite_count": 4,
+            "conversation_id_str": "main"
+          },
+          "quoted_status_result": {
+            "result": {
+              "tweet": {
+                "rest_id": "quote",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Quoted tweet\nwith a second line",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "quote",
+                  "extended_entities": {
+                    "media": [
+                      {
+                        "type": "photo",
+                        "media_url_https": "https://example.invalid/photo.jpg",
+                        "sizes": {
+                          "large": {
+                            "w": 1200,
+                            "h": 800
+                          },
+                          "small": {
+                            "w": 300,
+                            "h": 200
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "quoted_status_result": {
+                  "result": {
+                    "rest_id": "nested",
+                    "core": {
+                      "user_results": {
+                        "result": {
+                          "rest_id": "author-1",
+                          "legacy": {
+                            "screen_name": "alice",
+                            "name": "Alice"
+                          }
+                        }
+                      }
+                    },
+                    "legacy": {
+                      "full_text": "Nested quote",
+                      "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                      "reply_count": 2,
+                      "retweet_count": 3,
+                      "favorite_count": 4,
+                      "conversation_id_str": "nested"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n>  QT @alice:\n> Quoted tweet\n> with a second line\n> PHOTO: https://example.invalid/photo.jpg\n>  https://x.com/alice/status/quote\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/main\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "article",
+      "mode": "plain",
+      "tweet": {
+        "id": "article",
+        "text": "# A title\n\nA full article body",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "A title",
+          "previewText": "Preview"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: A title\n   Preview\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/article\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "plain-article",
+      "mode": "plain",
+      "tweet": {
+        "id": "plain-article",
+        "text": "Article title\n\nThe full body.",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "plain-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Article title"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: Article title\n\nThe full body.\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/plain-article\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "long-note",
+      "mode": "plain",
+      "tweet": {
+        "id": "note",
+        "text": "Complete long text",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "note",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nComplete long text\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/note\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "video",
+      "mode": "plain",
+      "tweet": {
+        "id": "video",
+        "text": "Video",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "video",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "video",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small",
+            "videoUrl": "https://example.invalid/high.mp4",
+            "durationMs": 1500
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nVideo\nVIDEO: https://example.invalid/photo.jpg\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/video\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "gif",
+      "mode": "plain",
+      "tweet": {
+        "id": "gif",
+        "text": "GIF",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "gif",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "animated_gif",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small",
+            "videoUrl": "https://example.invalid/gif.mp4"
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nGIF\nGIF: https://example.invalid/photo.jpg\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/gif\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "wrapped",
+      "mode": "plain",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ],
+          "_raw": {
+            "rest_id": "quote",
+            "core": {
+              "user_results": {
+                "result": {
+                  "rest_id": "author-1",
+                  "legacy": {
+                    "screen_name": "alice",
+                    "name": "Alice"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "full_text": "Quoted tweet\nwith a second line",
+              "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+              "reply_count": 2,
+              "retweet_count": 3,
+              "favorite_count": 4,
+              "conversation_id_str": "quote",
+              "extended_entities": {
+                "media": [
+                  {
+                    "type": "photo",
+                    "media_url_https": "https://example.invalid/photo.jpg",
+                    "sizes": {
+                      "large": {
+                        "w": 1200,
+                        "h": 800
+                      },
+                      "small": {
+                        "w": 300,
+                        "h": 200
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "quoted_status_result": {
+              "result": {
+                "rest_id": "nested",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Nested quote",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "nested"
+                }
+              }
+            }
+          }
+        },
+        "_raw": {
+          "rest_id": "main",
+          "core": {
+            "user_results": {
+              "result": {
+                "rest_id": "author-1",
+                "legacy": {
+                  "screen_name": "alice",
+                  "name": "Alice"
+                }
+              }
+            }
+          },
+          "legacy": {
+            "full_text": " Main tweet ",
+            "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+            "reply_count": 2,
+            "retweet_count": 3,
+            "favorite_count": 4,
+            "conversation_id_str": "main"
+          },
+          "quoted_status_result": {
+            "result": {
+              "tweet": {
+                "rest_id": "quote",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Quoted tweet\nwith a second line",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "quote",
+                  "extended_entities": {
+                    "media": [
+                      {
+                        "type": "photo",
+                        "media_url_https": "https://example.invalid/photo.jpg",
+                        "sizes": {
+                          "large": {
+                            "w": 1200,
+                            "h": 800
+                          },
+                          "small": {
+                            "w": 300,
+                            "h": 200
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "quoted_status_result": {
+                  "result": {
+                    "rest_id": "nested",
+                    "core": {
+                      "user_results": {
+                        "result": {
+                          "rest_id": "author-1",
+                          "legacy": {
+                            "screen_name": "alice",
+                            "name": "Alice"
+                          }
+                        }
+                      }
+                    },
+                    "legacy": {
+                      "full_text": "Nested quote",
+                      "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                      "reply_count": 2,
+                      "retweet_count": 3,
+                      "favorite_count": 4,
+                      "conversation_id_str": "nested"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n>  QT @alice:\n> Quoted tweet\n> with a second line\n> PHOTO: https://example.invalid/photo.jpg\n>  https://x.com/alice/status/quote\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/main\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "empty-name",
+      "mode": "plain",
+      "tweet": {
+        "id": "empty-name",
+        "text": "Text",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "empty-name",
+        "author": {
+          "username": "alice",
+          "name": "alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (alice):\nText\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/empty-name\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "nested-article",
+      "mode": "plain",
+      "tweet": {
+        "id": "nested-article",
+        "text": "Title\n\nNested body",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "nested-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Title"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: Title\n\nNested body\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/nested-article\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "ordered-article",
+      "mode": "plain",
+      "tweet": {
+        "id": "ordered-article",
+        "text": "Title\n\nFirst paragraph\n\nSecond paragraph",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "ordered-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Title"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: Title\n\nFirst paragraph\n\nSecond paragraph\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/ordered-article\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "video-without-variants",
+      "mode": "plain",
+      "tweet": {
+        "id": "video-without-variants",
+        "text": "Video",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "video-without-variants",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "video",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small"
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nVideo\nVIDEO: https://example.invalid/photo.jpg\ndate: Tue Sep 22 13:27:42 +0000 2026\nurl: https://x.com/alice/status/video-without-variants\nlikes: 4  retweets: 3  replies: 2"
+    },
+    {
+      "name": "ordinary",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "ordinary",
+        "text": "Hello",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "ordinary",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nHello\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/ordinary\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "quote",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ]
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n>  QT @alice:\n> Quoted tweet\n> with a second line\n> PHOTO: https://example.invalid/photo.jpg\n>  https://x.com/alice/status/quote\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/main\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "quote-disabled",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/main\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "nested-raw",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "quotedTweet": {
+            "id": "nested",
+            "text": "Nested quote",
+            "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+            "replyCount": 2,
+            "retweetCount": 3,
+            "likeCount": 4,
+            "conversationId": "nested",
+            "author": {
+              "username": "alice",
+              "name": "Alice"
+            },
+            "authorId": "author-1",
+            "_raw": {
+              "rest_id": "nested",
+              "core": {
+                "user_results": {
+                  "result": {
+                    "rest_id": "author-1",
+                    "legacy": {
+                      "screen_name": "alice",
+                      "name": "Alice"
+                    }
+                  }
+                }
+              },
+              "legacy": {
+                "full_text": "Nested quote",
+                "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                "reply_count": 2,
+                "retweet_count": 3,
+                "favorite_count": 4,
+                "conversation_id_str": "nested"
+              }
+            }
+          },
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ],
+          "_raw": {
+            "rest_id": "quote",
+            "core": {
+              "user_results": {
+                "result": {
+                  "rest_id": "author-1",
+                  "legacy": {
+                    "screen_name": "alice",
+                    "name": "Alice"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "full_text": "Quoted tweet\nwith a second line",
+              "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+              "reply_count": 2,
+              "retweet_count": 3,
+              "favorite_count": 4,
+              "conversation_id_str": "quote",
+              "extended_entities": {
+                "media": [
+                  {
+                    "type": "photo",
+                    "media_url_https": "https://example.invalid/photo.jpg",
+                    "sizes": {
+                      "large": {
+                        "w": 1200,
+                        "h": 800
+                      },
+                      "small": {
+                        "w": 300,
+                        "h": 200
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "quoted_status_result": {
+              "result": {
+                "rest_id": "nested",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Nested quote",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "nested"
+                }
+              }
+            }
+          }
+        },
+        "_raw": {
+          "rest_id": "main",
+          "core": {
+            "user_results": {
+              "result": {
+                "rest_id": "author-1",
+                "legacy": {
+                  "screen_name": "alice",
+                  "name": "Alice"
+                }
+              }
+            }
+          },
+          "legacy": {
+            "full_text": " Main tweet ",
+            "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+            "reply_count": 2,
+            "retweet_count": 3,
+            "favorite_count": 4,
+            "conversation_id_str": "main"
+          },
+          "quoted_status_result": {
+            "result": {
+              "tweet": {
+                "rest_id": "quote",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Quoted tweet\nwith a second line",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "quote",
+                  "extended_entities": {
+                    "media": [
+                      {
+                        "type": "photo",
+                        "media_url_https": "https://example.invalid/photo.jpg",
+                        "sizes": {
+                          "large": {
+                            "w": 1200,
+                            "h": 800
+                          },
+                          "small": {
+                            "w": 300,
+                            "h": 200
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "quoted_status_result": {
+                  "result": {
+                    "rest_id": "nested",
+                    "core": {
+                      "user_results": {
+                        "result": {
+                          "rest_id": "author-1",
+                          "legacy": {
+                            "screen_name": "alice",
+                            "name": "Alice"
+                          }
+                        }
+                      }
+                    },
+                    "legacy": {
+                      "full_text": "Nested quote",
+                      "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                      "reply_count": 2,
+                      "retweet_count": 3,
+                      "favorite_count": 4,
+                      "conversation_id_str": "nested"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n>  QT @alice:\n> Quoted tweet\n> with a second line\n> PHOTO: https://example.invalid/photo.jpg\n>  https://x.com/alice/status/quote\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/main\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "article",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "article",
+        "text": "# A title\n\nA full article body",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "A title",
+          "previewText": "Preview"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: A title\n   Preview\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/article\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "plain-article",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "plain-article",
+        "text": "Article title\n\nThe full body.",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "plain-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Article title"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: Article title\n\nThe full body.\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/plain-article\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "long-note",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "note",
+        "text": "Complete long text",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "note",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (Alice):\nComplete long text\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/note\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "video",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "video",
+        "text": "Video",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "video",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "video",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small",
+            "videoUrl": "https://example.invalid/high.mp4",
+            "durationMs": 1500
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nVideo\nVIDEO: https://example.invalid/photo.jpg\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/video\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "gif",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "gif",
+        "text": "GIF",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "gif",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "animated_gif",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small",
+            "videoUrl": "https://example.invalid/gif.mp4"
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nGIF\nGIF: https://example.invalid/photo.jpg\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/gif\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "wrapped",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "main",
+        "text": "Main tweet",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "main",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "quotedTweet": {
+          "id": "quote",
+          "text": "Quoted tweet\nwith a second line",
+          "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+          "replyCount": 2,
+          "retweetCount": 3,
+          "likeCount": 4,
+          "conversationId": "quote",
+          "author": {
+            "username": "alice",
+            "name": "Alice"
+          },
+          "authorId": "author-1",
+          "media": [
+            {
+              "type": "photo",
+              "url": "https://example.invalid/photo.jpg",
+              "width": 1200,
+              "height": 800,
+              "previewUrl": "https://example.invalid/photo.jpg:small"
+            }
+          ],
+          "_raw": {
+            "rest_id": "quote",
+            "core": {
+              "user_results": {
+                "result": {
+                  "rest_id": "author-1",
+                  "legacy": {
+                    "screen_name": "alice",
+                    "name": "Alice"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "full_text": "Quoted tweet\nwith a second line",
+              "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+              "reply_count": 2,
+              "retweet_count": 3,
+              "favorite_count": 4,
+              "conversation_id_str": "quote",
+              "extended_entities": {
+                "media": [
+                  {
+                    "type": "photo",
+                    "media_url_https": "https://example.invalid/photo.jpg",
+                    "sizes": {
+                      "large": {
+                        "w": 1200,
+                        "h": 800
+                      },
+                      "small": {
+                        "w": 300,
+                        "h": 200
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "quoted_status_result": {
+              "result": {
+                "rest_id": "nested",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Nested quote",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "nested"
+                }
+              }
+            }
+          }
+        },
+        "_raw": {
+          "rest_id": "main",
+          "core": {
+            "user_results": {
+              "result": {
+                "rest_id": "author-1",
+                "legacy": {
+                  "screen_name": "alice",
+                  "name": "Alice"
+                }
+              }
+            }
+          },
+          "legacy": {
+            "full_text": " Main tweet ",
+            "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+            "reply_count": 2,
+            "retweet_count": 3,
+            "favorite_count": 4,
+            "conversation_id_str": "main"
+          },
+          "quoted_status_result": {
+            "result": {
+              "tweet": {
+                "rest_id": "quote",
+                "core": {
+                  "user_results": {
+                    "result": {
+                      "rest_id": "author-1",
+                      "legacy": {
+                        "screen_name": "alice",
+                        "name": "Alice"
+                      }
+                    }
+                  }
+                },
+                "legacy": {
+                  "full_text": "Quoted tweet\nwith a second line",
+                  "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                  "reply_count": 2,
+                  "retweet_count": 3,
+                  "favorite_count": 4,
+                  "conversation_id_str": "quote",
+                  "extended_entities": {
+                    "media": [
+                      {
+                        "type": "photo",
+                        "media_url_https": "https://example.invalid/photo.jpg",
+                        "sizes": {
+                          "large": {
+                            "w": 1200,
+                            "h": 800
+                          },
+                          "small": {
+                            "w": 300,
+                            "h": 200
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "quoted_status_result": {
+                  "result": {
+                    "rest_id": "nested",
+                    "core": {
+                      "user_results": {
+                        "result": {
+                          "rest_id": "author-1",
+                          "legacy": {
+                            "screen_name": "alice",
+                            "name": "Alice"
+                          }
+                        }
+                      }
+                    },
+                    "legacy": {
+                      "full_text": "Nested quote",
+                      "created_at": "Tue Sep 22 13:27:42 +0000 2026",
+                      "reply_count": 2,
+                      "retweet_count": 3,
+                      "favorite_count": 4,
+                      "conversation_id_str": "nested"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expected": "\n@alice (Alice):\nMain tweet\n>  QT @alice:\n> Quoted tweet\n> with a second line\n> PHOTO: https://example.invalid/photo.jpg\n>  https://x.com/alice/status/quote\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/main\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "empty-name",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "empty-name",
+        "text": "Text",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "empty-name",
+        "author": {
+          "username": "alice",
+          "name": "alice"
+        },
+        "authorId": "author-1"
+      },
+      "expected": "\n@alice (alice):\nText\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/empty-name\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "nested-article",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "nested-article",
+        "text": "Title\n\nNested body",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "nested-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Title"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: Title\n\nNested body\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/nested-article\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "ordered-article",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "ordered-article",
+        "text": "Title\n\nFirst paragraph\n\nSecond paragraph",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "ordered-article",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "article": {
+          "title": "Title"
+        }
+      },
+      "expected": "\n@alice (Alice):\nArticle: Title\n\nFirst paragraph\n\nSecond paragraph\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/ordered-article\nLikes 4  Retweets 3  Replies 2"
+    },
+    {
+      "name": "video-without-variants",
+      "mode": "noEmoji",
+      "tweet": {
+        "id": "video-without-variants",
+        "text": "Video",
+        "createdAt": "Tue Sep 22 13:27:42 +0000 2026",
+        "replyCount": 2,
+        "retweetCount": 3,
+        "likeCount": 4,
+        "conversationId": "video-without-variants",
+        "author": {
+          "username": "alice",
+          "name": "Alice"
+        },
+        "authorId": "author-1",
+        "media": [
+          {
+            "type": "video",
+            "url": "https://example.invalid/photo.jpg",
+            "width": 1200,
+            "height": 800,
+            "previewUrl": "https://example.invalid/photo.jpg:small"
+          }
+        ]
+      },
+      "expected": "\n@alice (Alice):\nVideo\nVIDEO: https://example.invalid/photo.jpg\nDate: Tue Sep 22 13:27:42 +0000 2026\nURL: https://x.com/alice/status/video-without-variants\nLikes 4  Retweets 3  Replies 2"
+    }
+  ]
+}

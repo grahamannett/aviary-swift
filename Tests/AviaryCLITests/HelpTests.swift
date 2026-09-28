@@ -1,13 +1,13 @@
-import Testing
+import XCTest
 import AviaryCLI
 
-@Suite struct HelpTests {
-    @Test func shorthand() {
+final class HelpTests: XCTestCase {
+    func testShorthand() {
         let out = AviaryRoot.rewrittenArguments(["2098225368230732160", "--json"])
-        #expect(out.first == "read")
+        XCTAssertTrue(out.first == "read")
         let url = AviaryRoot.rewrittenArguments(["https://x.com/RichardMCNgo/status/2098225368230732160"])
-        #expect(url.first == "read")
+        XCTAssertTrue(url.first == "read")
         let keep = AviaryRoot.rewrittenArguments(["thread", "1"])
-        #expect(keep.first == "thread")
+        XCTAssertTrue(keep.first == "thread")
     }
 }
