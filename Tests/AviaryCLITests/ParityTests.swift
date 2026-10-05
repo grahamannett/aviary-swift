@@ -21,7 +21,6 @@ final class ParityCommandTests: XCTestCase {
         XCTAssertEqual(AviaryRoot.rewrittenArguments(["--auth-token", "123456789", "whoami"]), ["--auth-token", "123456789", "whoami"])
         XCTAssertEqual(AviaryRoot.rewrittenArguments(["-V"]), ["--version"])
         XCTAssertEqual(AviaryRoot.rewrittenArguments(["tweet", "--", "-V"]), ["tweet", "--", "-V"])
-        XCTAssertEqual(AviaryRoot.rewrittenArguments(["--alt", "-V", "tweet", "hello"]), ["--alt", "-V", "tweet", "hello"])
     }
 
     func testVersionFlagDoesNotRewriteCommandOptionValues() throws {
@@ -32,6 +31,30 @@ final class ParityCommandTests: XCTestCase {
         XCTAssertEqual(try replies.page.resolved().cursor, "-V")
         let userTweets = try parse(["user-tweets", "alice", "--cursor", "-V"], as: UserTweets.self)
         XCTAssertEqual(userTweets.cursor, "-V")
+    }
+
+    func testOpaqueValuesCannotEnableOutputFlags() throws {
+        for flag in ["--plain", "--no-emoji", "--no-color"] {
+            let args = ["search", "swift", "--cursor", flag, "--max-pages", "0"]
+            let invocation = InvocationArguments(args)
+            let command = try parse(args, as: Search.self)
+            XCTAssertEqual(command.page.cursor, flag)
+            XCTAssertFalse(command.opts.plain)
+            XCTAssertFalse(command.opts.noEmojiFlag)
+            XCTAssertFalse(command.opts.noColorFlag)
+            XCTAssertFalse(invocation.output.plain)
+            XCTAssertTrue(invocation.output.emoji)
+            XCTAssertThrowsError(try command.page.resolved())
+        }
+        let command = try parse(["search", "swift", "--cursor", "--plain", "--plain"], as: Search.self)
+        XCTAssertEqual(command.page.cursor, "--plain")
+        XCTAssertTrue(command.opts.plain)
+        let tweet = try parse(["tweet", "--", "--plain"], as: Tweet.self)
+        XCTAssertEqual(tweet.text, "--plain")
+        XCTAssertFalse(tweet.opts.plain)
+        XCTAssertFalse(InvocationArguments(["tweet", "--", "--plain"]).output.plain)
+        let media = try parse(["tweet", "hello", "--alt", "-V"], as: Tweet.self)
+        XCTAssertEqual(media.opts.alt, ["-V"])
     }
 
     func testGlobalFlagsBeforeAndAfterCommand() throws {

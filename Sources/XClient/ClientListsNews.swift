@@ -10,7 +10,7 @@ extension TwitterClient {
             "isListMembershipShown": true, "isListMemberTargetUserId": user.id], featureSet: "lists")
         guard response.success else { return ListsResult(success: false, lists: [], error: response.error) }
         guard let instructions = instructionsForOperation(response.json, operation) else { return ListsResult(success: false, lists: [], error: "Missing list timeline in response") }
-        let lists = timelineItemContents(instructions).compactMap { item -> TwitterList? in
+        let lists = JSON.timelineItemContents(instructions).compactMap { item -> TwitterList? in
             guard let list = JSON.object(item["list"]), let id = stringID(list["id_str"]), let name = JSON.string(list["name"]) else { return nil }
             let owner = mapUser(JSON.object(JSON.path(list, "user_results", "result"))).map {
                 TwitterUser(id: $0.id, username: $0.username, name: $0.name)
@@ -38,22 +38,12 @@ extension TwitterClient {
             let response = await graphRead(operation: "GenericTimelineById", variables: ["timelineId": id, "count": min(count, Int.max / 2) * 2, "includePromotedContent": false], featureSet: "explore")
             guard response.success else { lastError = response.error; continue }
             let instructions = instructionsForOperation(response.json, "GenericTimelineById")
-            for instruction in JSON.array(instructions) ?? [] {
-                let object = JSON.object(instruction) ?? [:]
-                let entries = JSON.array(object["entries"]) ?? object["entry"].map { [$0] } ?? []
-                for entry in entries {
-                    let entryId = JSON.string(JSON.object(entry)?["entryId"])
-                    let wrapper: [[String: Any]] = [["entries": [entry]]]
-                    for content in timelineItemContents(wrapper) {
-                        if let item = parseNewsItem(content, entryId: entryId, source: tab, aiOnly: aiOnly, includeRaw: includeRaw), seen.insert(item.headline).inserted {
-                            items.append(item)
-                        }
-                        if items.count >= count { break }
-                    }
-                    if items.count >= count { break }
+            JSON.walkTimeline(instructions, item: { content, entryId in
+                if let item = parseNewsItem(content, entryId: entryId, source: tab, aiOnly: aiOnly, includeRaw: includeRaw), seen.insert(item.headline).inserted {
+                    items.append(item)
                 }
-                if items.count >= count { break }
-            }
+                return items.count < count
+            })
             if items.count >= count { break }
         }
         guard !items.isEmpty else { return NewsResult(success: false, items: [], error: lastError ?? "No news items found") }

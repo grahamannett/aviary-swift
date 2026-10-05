@@ -32,31 +32,19 @@ struct GlobalOptions: ParsableArguments {
         [chromeProfileDir, chromeProfile, config.chromeProfileDir, config.chromeProfile].compactMap { $0 }.first { !$0.isEmpty }
     }
 
-    func credentials() async throws -> TwitterCookies {
-        let config = BirdConfig.load(warn: { stderrLine("\(p("warn"))\($0)") })
-        let env = ProcessInfo.processInfo.environment
-        let sources: [BrowserName]
-        do { sources = try config.resolveCookieSources(cli: cookieSource) }
-        catch { throw CLIError("\(p("err"))\(error.localizedDescription)") }
-        return await resolveTwitterCredentials(
-            authToken: authToken, ct0: ct0, cookieSource: sources,
-            chromeProfile: chromeProfileResolved(config),
-            firefoxProfile: [firefoxProfile, config.firefoxProfile].compactMap { $0 }.first { !$0.isEmpty },
-            cookieTimeoutMs: config.resolveCookieTimeout(cli: cookieTimeout, env: env["BIRD_COOKIE_TIMEOUT_MS"])
-        )
+    func resolvedInvocation() throws -> ResolvedInvocation {
+        try ResolvedInvocation(options: self,
+            config: BirdConfig.load(warn: { stderrLine("\(p("warn"))\($0)") }),
+            environment: ProcessInfo.processInfo.environment)
     }
 
-    func makeClient(_ cookies: TwitterCookies) -> TwitterClient {
-        // Credential resolution already reported config diagnostics for this command.
-        let config = BirdConfig.load(warn: { _ in })
-        let env = ProcessInfo.processInfo.environment
-        return TwitterClient(cookies: cookies,
-            timeoutMs: config.resolveTimeout(cli: timeout, env: env["BIRD_TIMEOUT_MS"]),
-            quoteDepth: config.resolveQuoteDepth(cli: quoteDepth, env: env["BIRD_QUOTE_DEPTH"]) ?? 1)
+    func credentials() async throws -> TwitterCookies {
+        try await resolvedInvocation().credentials()
     }
 
     func authenticatedClient() async throws -> TwitterClient {
-        makeClient(try require(try await credentials()))
+        let invocation = try resolvedInvocation()
+        return invocation.makeClient(try require(await invocation.credentials()))
     }
 
     func require(_ cookies: TwitterCookies) throws -> TwitterCookies {
@@ -65,6 +53,41 @@ struct GlobalOptions: ParsableArguments {
             throw CLIError("\(p("err"))Missing required credentials")
         }
         return cookies
+    }
+}
+
+/// One configuration/environment snapshot supplies both cookies and HTTP settings.
+struct ResolvedInvocation {
+    let options: GlobalOptions
+    let chromeProfile: String?
+    let firefoxProfile: String?
+    let cookieSources: [BrowserName]
+    let cookieTimeout: Double?
+    let timeout: Double?
+    let quoteDepth: Int
+    let environment: [String: String]
+
+    init(options: GlobalOptions, config: BirdConfig, environment: [String: String]) throws {
+        self.options = options
+        self.environment = environment
+        do { cookieSources = try config.resolveCookieSources(cli: options.cookieSource) }
+        catch { throw CLIError("\(options.p("err"))\(error.localizedDescription)") }
+        chromeProfile = options.chromeProfileResolved(config)
+        firefoxProfile = [options.firefoxProfile, config.firefoxProfile].compactMap { $0 }.first { !$0.isEmpty }
+        cookieTimeout = config.resolveCookieTimeout(cli: options.cookieTimeout, env: environment["BIRD_COOKIE_TIMEOUT_MS"])
+        timeout = config.resolveTimeout(cli: options.timeout, env: environment["BIRD_TIMEOUT_MS"])
+        quoteDepth = config.resolveQuoteDepth(cli: options.quoteDepth, env: environment["BIRD_QUOTE_DEPTH"]) ?? 1
+    }
+
+    func credentials() async -> TwitterCookies {
+        await resolveTwitterCredentials(
+            authToken: options.authToken, ct0: options.ct0, cookieSource: cookieSources,
+            chromeProfile: chromeProfile, firefoxProfile: firefoxProfile,
+            cookieTimeoutMs: cookieTimeout, environment: environment)
+    }
+
+    func makeClient(_ cookies: TwitterCookies) -> TwitterClient {
+        TwitterClient(cookies: cookies, timeoutMs: timeout, quoteDepth: quoteDepth)
     }
 }
 

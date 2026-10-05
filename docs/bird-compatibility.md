@@ -26,11 +26,15 @@ Normal collection JSON is an array. Paginated JSON contains `tweets` or `users` 
 
 Count and page flags retain their command-specific Bird behavior. For search, bookmarks, and likes, `--max-pages` needs `--all` or `--cursor`. For replies, thread, and list-timeline it enables pagination itself. Followers/following require `--all` with `--max-pages`. User tweets has its own bounded paging interface, without `--all`.
 
-Cursor values are opaque and may resemble flags (for example, `--cursor -V`); they are passed through without version-flag rewriting.
+Cursor values are opaque and may resemble flags (for example, `--cursor -V` or `--cursor --plain`); they are passed through without enabling version or output flags. The option terminator also prevents literal arguments from selecting output modes. Argument interpretation derives option arity and command aliases from ArgumentParser's version-0 help metadata rather than maintaining separate command/option lists; parser upgrades must retain or explicitly migrate that metadata contract.
 
 ## Configuration and isolation
 
 Global `~/.config/bird/config.json5` and project `.birdrc.json5` are merged in that order. Valid JSON5 syntax and local null overrides are supported; malformed configuration warns. CLI/config/environment precedence, browser-source normalization, and profile environment variables match Bird. Default Chrome uses `Default`; Firefox prefers `default-release`. Explicit profile selection does not silently become a scan of other accounts.
+
+An authenticated invocation resolves configuration and environment once, then uses that snapshot for both browser credential extraction and HTTP client settings.
+
+Chrome and Firefox databases are acquired through SQLite's backup API rather than independent database/WAL/SHM copies. Snapshots include committed WAL state, exclude uncommitted writes, and are converted to standalone rollback-journal databases before read-only extraction. Backup stepping and lock waits have a two-second deadline; unreadable, corrupt, or persistently busy databases produce extraction warnings instead of silently ignoring sidecar failures.
 
 Aviary reads legacy query-ID/feature caches as fallbacks, but default writes go to `$XDG_CONFIG_HOME/aviary` or `~/.config/aviary`. `AVIARY_QUERY_IDS_CACHE`, `AVIARY_FEATURES_CACHE`/`AVIARY_FEATURES_PATH`, and `AVIARY_FEATURES_JSON` provide Aviary-specific overrides. Legacy `BIRD_QUERY_IDS_CACHE`, `BIRD_FEATURES_CACHE`/`BIRD_FEATURES_PATH`, and `BIRD_FEATURES_JSON` remain supported as read-only inputs or invocation-only feature overrides. Cache refresh does not persist environment feature overrides.
 
@@ -39,6 +43,8 @@ Query-ID discovery pairs operation names and IDs within the same JavaScript obje
 ## Validation
 
 `mise run test` runs the registered XCTest suites. `mise run test-filter NAME` passes its filter through to `swift test`. Tests cover CLI parsing and rendering, request/response behavior, failed uploads and posts, pagination/cursors, per-bookmark expansion, articles and raw JSON, cache isolation, and synthetic Chrome/Firefox/Safari cookies. Boundary regressions include nonzero-index media slices, malformed processing metadata, ambiguous follow/unfollow failures, adjacent query-ID definitions, and malformed cookie records. No live account mutations are part of the tests.
+
+Timeline traversal is shared by tweet, cursor, user, list, article-fallback, and news mapping. It handles instruction `entries`, singular `entry`, and `moduleItems`, including nested module wrappers, without flattening quoted tweets into timeline results. Regression fixtures cover cursor preference, continuation requests, filtered-empty replies pages, and empty/duplicate-only termination. These responses are reconstructed synthetic fixtures, not live X captures.
 
 The checked-in oracle corpus contains every command/option from Bird 0.8, ordinary/quoted/article/video tweet mappings, rich article rendering, and normal/plain/no-emoji text snapshots. To regenerate it during development:
 
@@ -53,7 +59,7 @@ The generator reads Bird's pure mapper and CLI definitions; its writes are confi
 - The executable is `aviary`; help layout and version branding are native to Swift ArgumentParser.
 - Aviary keeps the existing `--full-chain` alias for `--full-chain-only` and nonconflicting optional positional username conveniences.
 - Caches are separate from Bird. No command installs, changes, or replaces Bird.
-- Browser credentials require a complete `auth_token`/`ct0` pair from the same exact `x.com` or `twitter.com` domain (with an optional leading dot), preferring X. Tokens from different domains are not combined. Firefox container identities are not currently distinguished within one domain.
+- Browser credentials require a complete `auth_token`/`ct0` pair from the same exact `x.com` or `twitter.com` domain (with an optional leading dot), preferring X. Tokens from different domains are not combined. Firefox preserves the complete `originAttributes` identity through extraction and deduplication, including container and partition attributes. Multiple contexts with relevant nonempty credentials are rejected, even if one context has only an incomplete pair. Supply both credentials explicitly or use a profile containing one account context; there is no container-selection flag. Credential resolution may continue to the next configured browser source after reporting the ambiguity.
 - Ambiguous write failures are not automatically resubmitted. Follow/unfollow try another mutation endpoint only after an endpoint-not-found response; timeouts, rate limits, server errors, API rejections, and malformed success responses terminate the operation. Media processing must explicitly succeed once asynchronous processing begins; missing status metadata and exhausted polling fail rather than reporting success. Malformed responses, cookie files, and cursor cycles are bounded and reported safely. Malformed or nonpositive counts are rejected before requests rather than sending invalid numeric values to X.
 
 Fixture parity establishes the local compatibility contract. X's private endpoints can change independently, so it does not guarantee every operation will keep working against the live service. Posting and account-changing operations are validated with mocks rather than live mutations.

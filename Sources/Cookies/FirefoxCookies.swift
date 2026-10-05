@@ -10,11 +10,14 @@ enum FirefoxCookies {
         }
         let hosts = origins.compactMap { $0.host }
         do {
-            let tmp = try SqliteHelper.copyDbWithSidecars(from: db)
+            let tmp = try SqliteHelper.snapshot(from: db)
             defer { try? FileManager.default.removeItem(at: tmp.deletingLastPathComponent()) }
+            let columns = try SqliteHelper.query(tmp.path, sql: "PRAGMA table_info(moz_cookies)")
+            let hasOriginAttributes = columns.contains { ($0["name"] as? String) == "originAttributes" }
+            let contextColumn = hasOriginAttributes ? "originAttributes" : "'' AS originAttributes"
             let rows = try SqliteHelper.query(
                 tmp.path,
-                sql: "SELECT name, value, host, path, expiry, isSecure, isHttpOnly FROM moz_cookies ORDER BY expiry DESC"
+                sql: "SELECT name, value, host, path, expiry, isSecure, isHttpOnly, \(contextColumn) FROM moz_cookies ORDER BY expiry DESC"
             )
             var cookies: [Cookie] = []
             for row in rows {
@@ -33,7 +36,8 @@ enum FirefoxCookies {
                         path: (row["path"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "/",
                         expires: expiry,
                         secure: (row["isSecure"] as? Int64) == 1,
-                        httpOnly: (row["isHttpOnly"] as? Int64) == 1
+                        httpOnly: (row["isHttpOnly"] as? Int64) == 1,
+                        originAttributes: (row["originAttributes"] as? String) ?? ""
                     )
                 )
             }

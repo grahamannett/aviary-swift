@@ -144,10 +144,11 @@ func uploadThenCreate(text: String, replyTo: String?, media: [MediaInput],
 
 func post(text: String, replyTo: String?, opts: GlobalOptions) async throws {
     let media = try loadMedia(paths: opts.media, alts: opts.alt)
-    let cookies = try opts.require(try await opts.credentials())
+    let invocation = try opts.resolvedInvocation()
+    let cookies = try opts.require(await invocation.credentials())
     if let source = cookies.source { stderrLine(opts.l("source") + source) }
     if let replyTo { stderrLine("\(opts.p("info"))Replying to tweet: \(replyTo)") }
-    let client = opts.makeClient(cookies)
+    let client = invocation.makeClient(cookies)
     let result = try await uploadThenCreate(text: text, replyTo: replyTo, media: media,
         upload: { await client.uploadMedia(data: $0.data, mimeType: $0.mimeType, alt: $0.alt) },
         create: { await client.createTweet(text: $0, replyTo: $1, mediaIds: $2) })

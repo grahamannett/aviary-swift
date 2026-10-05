@@ -116,23 +116,4 @@ extension TwitterClient {
             return await self.timelinePage("ListLatestTweetsTimeline", variables: vars, featureSet: "lists", includeRaw: includeRaw)
         }
     }
-
-    func timelineItemContents(_ instructions: Any?) -> [[String: Any]] {
-        var result: [[String: Any]] = []
-        for instruction in JSON.array(instructions) ?? [] {
-            let object = JSON.object(instruction) ?? [:]
-            let entries = JSON.array(object["entries"]) ?? object["entry"].map { [$0] } ?? []
-            for entry in entries {
-                guard let content = JSON.object(JSON.object(entry)?["content"]) else { continue }
-                if let item = JSON.object(content["itemContent"]) { result.append(item) }
-                for nested in JSON.array(content["items"]) ?? [] {
-                    if let item = JSON.object(JSON.object(nested)?["itemContent"]) ?? JSON.object(JSON.path(nested, "item", "itemContent")) { result.append(item) }
-                }
-            }
-            for nested in JSON.array(object["moduleItems"]) ?? [] {
-                if let item = JSON.object(JSON.path(nested, "item", "itemContent")) ?? JSON.object(JSON.object(nested)?["itemContent"]) { result.append(item) }
-            }
-        }
-        return result
-    }
 }

@@ -2,18 +2,65 @@ import Foundation
 import SQLite3
 
 enum SqliteHelper {
-    static func copyDbWithSidecars(from dbPath: String) throws -> URL {
+    static func snapshot(from dbPath: String) throws -> URL {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("aviary-cookies-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let dest = tmp.appendingPathComponent("Cookies")
         do {
-            try FileManager.default.copyItem(atPath: dbPath, toPath: dest.path)
-            for suffix in ["-wal", "-shm"] {
-                let side = dbPath + suffix
-                if FileManager.default.fileExists(atPath: side) {
-                    try? FileManager.default.copyItem(atPath: side, toPath: dest.path + suffix)
-                }
+            var source: OpaquePointer?
+            guard sqlite3_open_v2(dbPath, &source, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+                let error = databaseError(source)
+                sqlite3_close(source)
+                throw error
             }
+            defer { sqlite3_close(source) }
+            var destination: OpaquePointer?
+            guard sqlite3_open_v2(dest.path, &destination, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
+                let error = databaseError(destination)
+                sqlite3_close(destination)
+                throw error
+            }
+            defer { sqlite3_close(destination) }
+            guard let backup = sqlite3_backup_init(destination, "main", source, "main") else {
+                throw databaseError(destination)
+            }
+            // SQLite reads committed WAL frames and restarts if another writer changes
+            // the source. Bound both lock waits and repeated restarts.
+            let deadline = ProcessInfo.processInfo.systemUptime + 2
+            var status: Int32
+            repeat {
+                status = sqlite3_backup_step(backup, 256)
+                if status == SQLITE_BUSY || status == SQLITE_LOCKED {
+                    Thread.sleep(forTimeInterval: 0.01)
+                } else if status != SQLITE_OK {
+                    break
+                }
+            } while ProcessInfo.processInfo.systemUptime < deadline
+            let finishStatus = sqlite3_backup_finish(backup)
+            guard status == SQLITE_DONE else {
+                if status == SQLITE_OK || status == SQLITE_BUSY || status == SQLITE_LOCKED {
+                    throw NSError(domain: "sqlite", code: Int(SQLITE_BUSY), userInfo: [
+                        NSLocalizedDescriptionKey: "Timed out acquiring a consistent cookie database snapshot."
+                    ])
+                }
+                throw databaseError(destination)
+            }
+            guard finishStatus == SQLITE_OK else { throw databaseError(destination) }
+            // A WAL source can leave its journal-mode header in the backup.
+            // Materialize a standalone database before read-only consumers open it.
+            var journalMode: OpaquePointer?
+            guard sqlite3_prepare_v2(destination, "PRAGMA journal_mode=DELETE", -1, &journalMode, nil) == SQLITE_OK else {
+                throw databaseError(destination)
+            }
+            defer { sqlite3_finalize(journalMode) }
+            guard sqlite3_step(journalMode) == SQLITE_ROW else { throw databaseError(destination) }
+            let mode = sqlite3_column_text(journalMode, 0).map { String(cString: $0) }
+            guard mode?.caseInsensitiveCompare("delete") == .orderedSame else {
+                throw NSError(domain: "sqlite", code: Int(SQLITE_ERROR), userInfo: [
+                    NSLocalizedDescriptionKey: "Unable to materialize a standalone cookie database snapshot."
+                ])
+            }
+            guard sqlite3_step(journalMode) == SQLITE_DONE else { throw databaseError(destination) }
         } catch {
             try? FileManager.default.removeItem(at: tmp)
             throw error

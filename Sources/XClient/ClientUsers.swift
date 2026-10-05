@@ -122,7 +122,7 @@ extension TwitterClient {
                 return .init(success: false, users: [], nextCursor: nil, error: "Missing timeline instructions in \(operation) response")
             }
             var users: [TwitterUser] = []
-            for item in timelineItemContents(instructions) {
+            for item in JSON.timelineItemContents(instructions) {
                 if let user = mapUser(JSON.object(JSON.path(item, "user_results", "result"))) { users.append(user) }
             }
             var seen = Set<String>()

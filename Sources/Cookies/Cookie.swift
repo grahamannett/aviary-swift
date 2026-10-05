@@ -8,6 +8,8 @@ public struct Cookie: Sendable {
     public var expires: Int?
     public var secure: Bool
     public var httpOnly: Bool
+    // nil for other browsers; Firefox's empty string identifies its default context.
+    public var originAttributes: String?
 
     public init(
         name: String,
@@ -16,7 +18,8 @@ public struct Cookie: Sendable {
         path: String = "/",
         expires: Int? = nil,
         secure: Bool = false,
-        httpOnly: Bool = false
+        httpOnly: Bool = false,
+        originAttributes: String? = nil
     ) {
         self.name = name
         self.value = value
@@ -25,6 +28,7 @@ public struct Cookie: Sendable {
         self.expires = expires
         self.secure = secure
         self.httpOnly = httpOnly
+        self.originAttributes = originAttributes
     }
 }
 

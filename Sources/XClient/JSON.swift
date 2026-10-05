@@ -28,64 +28,79 @@ enum JSON {
         }
         return cur
     }
+    // Only timeline containers are traversed; tweet/user payloads and quoted tweets
+    // remain leaves for the operation-specific mappers.
+    // Returning false from item stops traversal, retaining count-limited callers.
+    static func walkTimeline(_ instructions: Any?,
+                             item: ([String: Any], String?) -> Bool = { _, _ in true },
+                             cursor: ([String: Any]) -> Void = { _ in }) {
+        func walkNode(_ value: Any?, entryId inheritedId: String?) -> Bool {
+            guard let node = object(value) else { return true }
+            let entryId = inheritedId ?? string(node["entryId"])
+            if let content = object(node["content"]) {
+                cursor(content)
+                if !walkNode(content, entryId: entryId) { return false }
+            }
+            if let content = object(node["itemContent"]) {
+                cursor(content)
+                if !item(content, entryId) { return false }
+            }
+            if let nested = node["item"], !walkNode(nested, entryId: entryId) { return false }
+            for nested in array(node["items"]) ?? [] {
+                if !walkNode(nested, entryId: entryId) { return false }
+            }
+            return true
+        }
+        for instruction in array(instructions) ?? [] {
+            guard let instruction = object(instruction) else { continue }
+            if let entries = array(instruction["entries"]) {
+                for entry in entries {
+                    if !walkNode(entry, entryId: nil) { return }
+                }
+            } else if let entry = instruction["entry"], !walkNode(entry, entryId: nil) {
+                return
+            }
+            for nested in array(instruction["moduleItems"]) ?? [] {
+                if !walkNode(nested, entryId: string(instruction["moduleEntryId"])) { return }
+            }
+        }
+    }
+
+    static func timelineItemContents(_ instructions: Any?) -> [[String: Any]] {
+        var result: [[String: Any]] = []
+        walkTimeline(instructions, item: { content, _ in
+            result.append(content)
+            return true
+        })
+        return result
+    }
+
     static func walkTweets(_ instructions: Any?, quoteDepth: Int, includeRaw: Bool) -> [TweetData] {
         var tweets: [TweetData] = []
         var seen = Set<String>()
-        for instr in array(instructions) ?? [] {
-            for entry in array(object(instr)?["entries"]) ?? [] {
-                for result in tweetResults(from: entry) {
-                    if let mapped = mapTweet(result, quoteDepth: quoteDepth, includeRaw: includeRaw),
-                       seen.insert(mapped.id).inserted
-                    {
-                        tweets.append(mapped)
-                    }
-                }
+        walkTimeline(instructions, item: { content, _ in
+            if let result = object(path(content, "tweet_results", "result")),
+               let mapped = mapTweet(result, quoteDepth: quoteDepth, includeRaw: includeRaw),
+               seen.insert(mapped.id).inserted
+            {
+                tweets.append(mapped)
             }
-        }
+            return true
+        })
         return tweets
     }
 
     static func cursor(_ instructions: Any?, preferredTypes: [String] = ["Bottom", "ShowMore"]) -> String? {
         var cursors: [String: String] = [:]
-        func consider(_ content: [String: Any]?) {
-            guard let content else { return }
+        walkTimeline(instructions, cursor: { content in
             let cursorType = string(content["cursorType"]) ?? ""
-            guard let v = string(content["value"]), !v.isEmpty else { return }
-            if cursors[cursorType] == nil { cursors[cursorType] = v }
+            guard let value = string(content["value"]), !value.isEmpty else { return }
+            if cursors[cursorType] == nil { cursors[cursorType] = value }
+        })
+        for type in preferredTypes {
+            if let value = cursors[type] { return value }
         }
-        for instr in array(instructions) ?? [] {
-            for entry in array(object(instr)?["entries"]) ?? [] {
-                let content = object(object(entry)?["content"])
-                consider(content)
-                consider(object(path(content, "itemContent")))
-                for item in array(content?["items"]) ?? [] {
-                    let o = object(item)
-                    consider(object(o?["content"]))
-                    consider(object(path(o, "item", "content")))
-                    consider(object(path(o, "item", "itemContent")))
-                }
-            }
-        }
-        return preferredTypes.compactMap { cursors[$0] }.first
-    }
-
-    static func tweetResults(from entry: Any) -> [[String: Any]] {
-        var out: [[String: Any]] = []
-        func push(_ any: Any?) {
-            if let raw = object(any), let obj = object(raw["tweet"]) ?? object(raw), string(obj["rest_id"]) != nil {
-                out.append(obj)
-            }
-        }
-        let content = object(object(entry)?["content"])
-        push(path(content, "itemContent", "tweet_results", "result"))
-        push(path(content, "item", "itemContent", "tweet_results", "result"))
-        for item in array(content?["items"]) ?? [] {
-            let o = object(item)
-            push(path(o, "item", "itemContent", "tweet_results", "result"))
-            push(path(o, "itemContent", "tweet_results", "result"))
-            push(path(o, "content", "itemContent", "tweet_results", "result"))
-        }
-        return out
+        return nil
     }
 
     static func mapTweet(_ result: [String: Any], quoteDepth: Int, includeRaw: Bool) -> TweetData? {

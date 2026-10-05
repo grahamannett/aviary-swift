@@ -259,7 +259,7 @@ public actor TwitterClient {
         ], featureSet: "article", fieldToggles: ["withPayments": false, "withAuxiliaryUserLabels": false, "withArticleRichContentState": true,
                                                      "withArticlePlainText": true, "withGrokAnalyze": false, "withDisallowedReplyControls": false])
         guard response.success else { return nil }
-        for item in timelineItemContents(instructionsForOperation(response.json, "UserArticlesTweets")) {
+        for item in JSON.timelineItemContents(instructionsForOperation(response.json, "UserArticlesTweets")) {
             guard var tweet = JSON.object(JSON.path(item, "tweet_results", "result")) else { continue }
             if let inner = JSON.object(tweet["tweet"]) { tweet = inner }
             guard JSON.string(tweet["rest_id"]) == tweetId, let article = JSON.object(tweet["article"]) else { continue }

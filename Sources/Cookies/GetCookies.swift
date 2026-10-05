@@ -97,6 +97,10 @@ public func resolveTwitterCredentials(
     for source in sources {
         let extracted = await provider(source, resolvedChrome, resolvedFirefox, timeout)
         result.warnings.append(contentsOf: extracted.warnings)
+        if source == .firefox, hasAmbiguousAuthContexts(extracted.cookies) {
+            result.warnings.append("Found multiple Firefox account contexts; refusing to choose an account. Provide both --auth-token and --ct0 explicitly, or use a Firefox profile with only one account context.")
+            continue
+        }
         if let pair = pickAuth(extracted.cookies) {
             result.authToken = pair.auth
             result.ct0 = pair.ct0
@@ -138,7 +142,25 @@ private func firstEnvironmentCookie(_ env: [String: String], _ keys: [String]) -
     return nil
 }
 
+private func isAuthCookie(_ cookie: Cookie) -> Bool {
+    guard !cookie.value.isEmpty, cookie.name == "auth_token" || cookie.name == "ct0" else { return false }
+    let domain = cookie.domain.lowercased()
+    return domain == "x.com" || domain == ".x.com" || domain == "twitter.com" || domain == ".twitter.com"
+}
+
+private func hasAmbiguousAuthContexts(_ cookies: [Cookie]) -> Bool {
+    var context: String?
+    var foundContext = false
+    for cookie in cookies where isAuthCookie(cookie) {
+        if foundContext, context != cookie.originAttributes { return true }
+        context = cookie.originAttributes
+        foundContext = true
+    }
+    return false
+}
+
 func pickAuth(_ cookies: [Cookie]) -> (auth: String, ct0: String)? {
+    guard !hasAmbiguousAuthContexts(cookies) else { return nil }
     for domain in ["x.com", "twitter.com"] {
         let dottedDomain = ".\(domain)"
         var auth: String?
@@ -155,7 +177,9 @@ func pickAuth(_ cookies: [Cookie]) -> (auth: String, ct0: String)? {
 }
 
 func deduplicateCookies(_ cookies: [Cookie]) -> [Cookie] {
-    struct Key: Hashable { let name: String; let domain: String; let path: String }
+    struct Key: Hashable { let name: String; let domain: String; let path: String; let originAttributes: String? }
     var seen = Set<Key>()
-    return cookies.filter { seen.insert(Key(name: $0.name, domain: $0.domain, path: $0.path)).inserted }
+    return cookies.filter {
+        seen.insert(Key(name: $0.name, domain: $0.domain, path: $0.path, originAttributes: $0.originAttributes)).inserted
+    }
 }

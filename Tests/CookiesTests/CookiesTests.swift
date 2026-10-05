@@ -155,6 +155,125 @@ final class CookiesTests: XCTestCase {
         XCTAssertEqual(result.cookies.first?.value, "in-wal")
     }
 
+    func testFirefoxPreservesContainerIdentityAndRejectsAmbiguousAccounts() async throws {
+        let url = directory.appendingPathComponent("cookies.sqlite")
+        let db = try database(url, sql: """
+        CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, isHttpOnly INTEGER, originAttributes TEXT);
+        INSERT INTO moz_cookies VALUES('auth_token','default-auth','.x.com','/',2000,1,1,'');
+        INSERT INTO moz_cookies VALUES('ct0','default-csrf','.x.com','/',2000,1,0,'');
+        INSERT INTO moz_cookies VALUES('auth_token','container-auth','.x.com','/',3000,1,1,'^userContextId=2');
+        INSERT INTO moz_cookies VALUES('ct0','container-csrf','.x.com','/',3000,1,0,'^userContextId=2');
+        """)
+        defer { sqlite3_close(db) }
+        let extracted = FirefoxCookies.load(origins: origins, names: ["auth_token", "ct0"], profile: url.path, roots: [], now: 1000)
+        XCTAssertTrue(extracted.warnings.isEmpty)
+        XCTAssertEqual(Set(extracted.cookies.map(\.value)), ["default-auth", "default-csrf", "container-auth", "container-csrf"])
+        XCTAssertEqual(Set(extracted.cookies.compactMap(\.originAttributes)), ["", "^userContextId=2"])
+        XCTAssertNil(pickAuth(extracted.cookies))
+        let result = await resolveTwitterCredentials(
+            authToken: nil, ct0: nil, cookieSource: [.firefox], chromeProfile: nil, firefoxProfile: url.path,
+            cookieTimeoutMs: nil, environment: [:], cookieProvider: { _, _, _, _ in extracted }
+        )
+        XCTAssertFalse(result.isComplete)
+        XCTAssertNil(result.cookieHeader)
+        XCTAssertTrue(result.warnings.contains { $0.contains("multiple Firefox account contexts") })
+        XCTAssertFalse(result.warnings.joined().contains("container-auth"))
+    }
+
+    func testFirefoxNeverPairsCredentialsAcrossContainers() throws {
+        let url = directory.appendingPathComponent("cookies.sqlite")
+        let db = try database(url, sql: """
+        CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, isHttpOnly INTEGER, originAttributes TEXT);
+        INSERT INTO moz_cookies VALUES('auth_token','first-auth','.x.com','/',2000,1,1,'^userContextId=1');
+        INSERT INTO moz_cookies VALUES('ct0','second-csrf','.x.com','/',2000,1,0,'^userContextId=2');
+        """)
+        defer { sqlite3_close(db) }
+        let result = FirefoxCookies.load(origins: origins, names: [], profile: url.path, roots: [], now: 1000)
+        XCTAssertTrue(result.warnings.isEmpty)
+        XCTAssertNil(pickAuth(result.cookies))
+    }
+
+    func testFirefoxSingleContainerRetainsDomainPreferenceAndIgnoresUnrelatedContexts() throws {
+        let url = directory.appendingPathComponent("cookies.sqlite")
+        let db = try database(url, sql: """
+        CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, isHttpOnly INTEGER, originAttributes TEXT);
+        INSERT INTO moz_cookies VALUES('auth_token','twitter-auth','.twitter.com','/',3000,1,1,'^userContextId=3&privateBrowsingId=1');
+        INSERT INTO moz_cookies VALUES('ct0','twitter-csrf','.twitter.com','/',3000,1,0,'^userContextId=3&privateBrowsingId=1');
+        INSERT INTO moz_cookies VALUES('auth_token','x-auth','.x.com','/',2000,1,1,'^userContextId=3&privateBrowsingId=1');
+        INSERT INTO moz_cookies VALUES('ct0','x-csrf','.x.com','/',2000,1,0,'^userContextId=3&privateBrowsingId=1');
+        INSERT INTO moz_cookies VALUES('auth_token','expired','.x.com','/',999,1,1,'^userContextId=4');
+        INSERT INTO moz_cookies VALUES('ct0','','.x.com','/',2000,1,0,'^userContextId=4');
+        INSERT INTO moz_cookies VALUES('preference','unrelated','.x.com','/',2000,1,0,'');
+        """)
+        defer { sqlite3_close(db) }
+        let result = FirefoxCookies.load(origins: origins, names: [], profile: url.path, roots: [], now: 1000)
+        XCTAssertTrue(result.warnings.isEmpty)
+        XCTAssertEqual(pickAuth(result.cookies)?.auth, "x-auth")
+        XCTAssertEqual(pickAuth(result.cookies)?.ct0, "x-csrf")
+    }
+
+    func testFirefoxIncompleteSecondContextStillRejectsAutomaticSelection() {
+        let cookies = [
+            Cookie(name: "auth_token", value: "default-auth", domain: "x.com", originAttributes: ""),
+            Cookie(name: "ct0", value: "default-csrf", domain: "x.com", originAttributes: ""),
+            Cookie(name: "auth_token", value: "other-auth", domain: "twitter.com", originAttributes: "^userContextId=2"),
+        ]
+        XCTAssertNil(pickAuth(cookies))
+        XCTAssertNil(pickAuth(Array(cookies.reversed())))
+    }
+
+    func testFirefoxPartitionIdentityIsNotReducedToContainerID() {
+        let cookies = [
+            Cookie(name: "auth_token", value: "first-auth", domain: "x.com", originAttributes: "^userContextId=1&partitionKey=%28https%2Cx.com%29"),
+            Cookie(name: "ct0", value: "other-csrf", domain: "x.com", originAttributes: "^userContextId=1&partitionKey=%28https%2Cexample.com%29"),
+        ]
+        XCTAssertNil(pickAuth(cookies))
+    }
+
+    func testSQLiteSnapshotUsesCommittedWALStateAndSurvivesCheckpoint() throws {
+        let url = directory.appendingPathComponent("cookies.sqlite")
+        let db = try database(url, sql: """
+        PRAGMA journal_mode=WAL;
+        PRAGMA wal_autocheckpoint=0;
+        CREATE TABLE credentials(name TEXT PRIMARY KEY, value TEXT);
+        INSERT INTO credentials VALUES('auth_token','old-auth'),('ct0','old-csrf');
+        """)
+        defer { sqlite3_close(db) }
+        XCTAssertEqual(sqlite3_exec(db, "BEGIN IMMEDIATE; UPDATE credentials SET value = 'new-auth' WHERE name = 'auth_token';", nil, nil, nil), SQLITE_OK)
+        let before = try SqliteHelper.snapshot(from: url.path)
+        defer { try? FileManager.default.removeItem(at: before.deletingLastPathComponent()) }
+        XCTAssertEqual(try SqliteHelper.query(before.path, sql: "SELECT value FROM credentials ORDER BY name").compactMap { $0["value"] as? String }, ["old-auth", "old-csrf"])
+        XCTAssertEqual(sqlite3_exec(db, "UPDATE credentials SET value = 'new-csrf' WHERE name = 'ct0'; COMMIT;", nil, nil, nil), SQLITE_OK)
+        let after = try SqliteHelper.snapshot(from: url.path)
+        defer { try? FileManager.default.removeItem(at: after.deletingLastPathComponent()) }
+        XCTAssertEqual(sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE);", nil, nil, nil), SQLITE_OK)
+        XCTAssertEqual(try SqliteHelper.query(after.path, sql: "SELECT value FROM credentials ORDER BY name").compactMap { $0["value"] as? String }, ["new-auth", "new-csrf"])
+        XCTAssertEqual(try SqliteHelper.query(before.path, sql: "SELECT value FROM credentials ORDER BY name").compactMap { $0["value"] as? String }, ["old-auth", "old-csrf"])
+        XCTAssertEqual(try SqliteHelper.query(after.path, sql: "PRAGMA integrity_check").first?["integrity_check"] as? String, "ok")
+    }
+
+    func testSQLiteSnapshotRejectsExclusiveLockAndRecoversAfterUnlock() throws {
+        let url = directory.appendingPathComponent("locked.sqlite")
+        let db = try database(url, sql: "CREATE TABLE state(value INTEGER); INSERT INTO state VALUES(1); BEGIN EXCLUSIVE; UPDATE state SET value = 2;")
+        defer { sqlite3_close(db) }
+        XCTAssertThrowsError(try SqliteHelper.snapshot(from: url.path)) { error in
+            XCTAssertEqual((error as NSError).code, Int(SQLITE_BUSY))
+        }
+        XCTAssertEqual(sqlite3_exec(db, "ROLLBACK;", nil, nil, nil), SQLITE_OK)
+        let snapshot = try SqliteHelper.snapshot(from: url.path)
+        defer { try? FileManager.default.removeItem(at: snapshot.deletingLastPathComponent()) }
+        XCTAssertEqual(try SqliteHelper.query(snapshot.path, sql: "SELECT value FROM state").first?["value"] as? Int64, 1)
+    }
+
+    func testSQLiteSnapshotRejectsCorruptDatabase() throws {
+        let url = directory.appendingPathComponent("corrupt.sqlite")
+        try Data("not a SQLite database".utf8).write(to: url)
+        XCTAssertThrowsError(try SqliteHelper.snapshot(from: url.path))
+        let result = FirefoxCookies.load(origins: origins, names: [], profile: url.path, roots: [])
+        XCTAssertTrue(result.cookies.isEmpty)
+        XCTAssertTrue(result.warnings.contains { $0.contains("Failed to read Firefox cookies") })
+    }
+
     func testProfilesUseBirdDefaultsAndExactNames() throws {
         let chromeRoot = directory.appendingPathComponent("chrome")
         try emptyFile(chromeRoot.appendingPathComponent("Default/Cookies"))

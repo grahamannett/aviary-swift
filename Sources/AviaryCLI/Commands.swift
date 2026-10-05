@@ -33,9 +33,10 @@ struct Whoami: AsyncParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Show which Twitter account the current credentials belong to")
     @OptionGroup var opts: GlobalOptions
     func run() async throws {
-        let cookies = try opts.require(try await opts.credentials())
+        let invocation = try opts.resolvedInvocation()
+        let cookies = try opts.require(await invocation.credentials())
         if let source = cookies.source { stderrLine(opts.l("source") + source) }
-        let result = await opts.makeClient(cookies).getCurrentUser()
+        let result = await invocation.makeClient(cookies).getCurrentUser()
         guard result.success, let user = result.user else {
             throw CLIError("\(opts.p("err"))Failed to determine current user: \(result.error ?? "Unknown error")")
         }

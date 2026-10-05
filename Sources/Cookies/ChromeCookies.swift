@@ -55,7 +55,7 @@ enum ChromeCookies {
         let keys = [ChromeCrypto.deriveAes128CbcKey(password: password.trimmingCharacters(in: .whitespacesAndNewlines), iterations: 1003)]
         #endif
         do {
-            let tmp = try SqliteHelper.copyDbWithSidecars(from: dbPath)
+            let tmp = try SqliteHelper.snapshot(from: dbPath)
             defer { try? FileManager.default.removeItem(at: tmp.deletingLastPathComponent()) }
             let metaRows = (try? SqliteHelper.query(tmp.path, sql: "SELECT value FROM meta WHERE key = 'version'")) ?? []
             let metaVersion = (metaRows.first?["value"] as? String).flatMap(Int.init)

@@ -1,0 +1,180 @@
+{
+  "provenance": "Hand-authored regression responses reconstructed from the timeline entry/item/module field shapes already supported by Aviary. IDs, text, users and cursors are synthetic; these are not captured live X responses and do not establish current endpoint compatibility.",
+  "searchPages": [
+    {
+      "data": {
+        "search_by_raw_query": {
+          "search_timeline": {
+            "timeline": {
+              "instructions": [
+                {
+                  "type": "TimelinePinEntry",
+                  "entry": {
+                    "entryId": "tweet-101",
+                    "sortIndex": "300",
+                    "content": {
+                      "entryType": "TimelineTimelineItem",
+                      "itemContent": {
+                        "itemType": "TimelineTweet",
+                        "tweet_results": {
+                          "result": {
+                            "__typename": "Tweet",
+                            "rest_id": "101",
+                            "core": {"user_results": {"result": {"rest_id": "7", "legacy": {"screen_name": "fixture", "name": "Fixture"}}}},
+                            "legacy": {"full_text": "Pinned tweet", "conversation_id_str": "101"}
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "TimelineAddEntries",
+                  "entries": [
+                    {
+                      "entryId": "tweet-102",
+                      "sortIndex": "200",
+                      "content": {
+                        "entryType": "TimelineTimelineItem",
+                        "itemContent": {
+                          "itemType": "TimelineTweet",
+                          "tweet_results": {
+                            "result": {
+                              "__typename": "Tweet",
+                              "rest_id": "102",
+                              "core": {"user_results": {"result": {"rest_id": "7", "legacy": {"screen_name": "fixture", "name": "Fixture"}}}},
+                              "legacy": {"full_text": "Ordinary tweet", "conversation_id_str": "102"}
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "entryId": "conversation-103",
+                      "sortIndex": "100",
+                      "content": {
+                        "entryType": "TimelineTimelineModule",
+                        "items": [
+                          {
+                            "entryId": "conversation-103-tweet-103",
+                            "item": {
+                              "itemContent": {
+                                "itemType": "TimelineTweet",
+                                "tweet_results": {
+                                  "result": {
+                                    "__typename": "Tweet",
+                                    "rest_id": "103",
+                                    "core": {"user_results": {"result": {"rest_id": "7", "legacy": {"screen_name": "fixture", "name": "Fixture"}}}},
+                                    "legacy": {"full_text": "Module tweet", "conversation_id_str": "103"}
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {"item": {"itemContent": {"itemType": "TimelineTimelineCursor", "cursorType": "ShowMore", "value": "show-first"}}},
+                          {"item": {"itemContent": {"itemType": "TimelineTimelineCursor", "cursorType": "ShowMore", "value": "show-later"}}}
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "TimelineReplaceEntry",
+                  "entryIdToReplace": "cursor-bottom-0",
+                  "entry": {"entryId": "cursor-bottom-1", "content": {"entryType": "TimelineTimelineCursor", "cursorType": "Bottom", "value": ""}}
+                },
+                {
+                  "type": "TimelineReplaceEntry",
+                  "entryIdToReplace": "cursor-bottom-1",
+                  "entry": {"entryId": "cursor-bottom-2", "content": {"entryType": "TimelineTimelineCursor", "cursorType": "Bottom", "value": "page-two"}}
+                },
+                {
+                  "type": "TimelineAddEntries",
+                  "entries": [{"entryId": "cursor-top-0", "content": {"entryType": "TimelineTimelineCursor", "cursorType": "Top", "value": "top"}}]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "data": {
+        "search_by_raw_query": {
+          "search_timeline": {
+            "timeline": {
+              "instructions": [
+                {
+                  "type": "TimelineAddToModule",
+                  "moduleEntryId": "conversation-103",
+                  "moduleItems": [
+                    {
+                      "entryId": "conversation-103-tweet-104",
+                      "item": {
+                        "itemContent": {
+                          "itemType": "TimelineTweet",
+                          "tweet_results": {
+                            "result": {
+                              "__typename": "TweetWithVisibilityResults",
+                              "tweet": {
+                                "__typename": "Tweet",
+                                "rest_id": "104",
+                                "core": {"user_results": {"result": {"rest_id": "7", "legacy": {"screen_name": "fixture", "name": "Fixture"}}}},
+                                "legacy": {"full_text": "Added module tweet", "conversation_id_str": "103"},
+                                "quoted_status_result": {"result": {"rest_id": "900", "core": {"user_results": {"result": {"legacy": {"screen_name": "quoted"}}}}, "legacy": {"full_text": "Quoted, not a timeline entry"}}}
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "entryId": "conversation-103-tweet-102",
+                      "itemContent": {
+                        "itemType": "TimelineTweet",
+                        "tweet_results": {
+                          "result": {
+                            "rest_id": "102",
+                            "core": {"user_results": {"result": {"legacy": {"screen_name": "fixture"}}}},
+                            "legacy": {"full_text": "Duplicate from previous page"}
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "entryId": "conversation-103-nested",
+                      "item": {
+                        "content": {
+                          "entryType": "TimelineTimelineModule",
+                          "items": [
+                            {
+                              "content": {
+                                "itemContent": {
+                                  "itemType": "TimelineTweet",
+                                  "tweet_results": {
+                                    "result": {
+                                      "rest_id": "105",
+                                      "core": {"user_results": {"result": {"legacy": {"screen_name": "fixture", "name": "Fixture"}}}},
+                                      "legacy": {"full_text": "Nested module tweet", "conversation_id_str": "103"}
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {"item": {"itemContent": {"itemType": "TimelineTweet", "tweet_results": {"result": {"__typename": "TweetTombstone"}}}}},
+                            {"itemContent": {"itemType": "TimelineTimelineCursor", "cursorType": "Bottom", "value": "page-three"}},
+                            {"item": {"content": {"cursorType": "Bottom", "value": "later-bottom"}}}
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
