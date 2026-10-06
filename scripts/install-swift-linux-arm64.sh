@@ -24,10 +24,13 @@ archive_url="https://download.swift.org/swift-6.1.3-release/ubuntu2204-aarch64/s
 signing_fingerprint="52BB7E3DE28A71BE22EC05FFEF80A866B47A981F"
 key_file="$toolchain_dir/downloads/swift-release-key.asc"
 archive_file="$toolchain_dir/downloads/$archive_name"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 curl --fail --location --retry 3 "$archive_url" --output "$archive_file"
 curl --fail --location --retry 3 "$archive_url.sig" --output "$archive_file.sig"
-curl --fail --location --retry 3 https://www.swift.org/keys/release-key-swift-6.x.asc --output "$key_file"
+# Keep the public key local: swift.org can return an HTML response to CI runners.
+# Source: https://github.com/swiftlang/swift-org-website/blob/f3375943f0b692c9446b8559b5264b43e5139f46/keys/release-key-swift-6.x.asc
+cp "$script_dir/keys/swift-release-key-6.x.asc" "$key_file"
 actual_fingerprint="$(gpg --batch --homedir "$toolchain_dir/gnupg" --show-keys --with-colons "$key_file" | awk -F: '$1 == "fpr" { print $10; exit }')"
 if [[ "$actual_fingerprint" != "$signing_fingerprint" ]]; then
   echo "Unexpected Swift release signing-key fingerprint: $actual_fingerprint" >&2

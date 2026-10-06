@@ -177,6 +177,7 @@ def package(args):
         shutil.copy2(repository / "LICENSE", docs)
     dependencies_dir = docs / "dependencies"
     dependencies_dir.mkdir()
+    shutil.copy2(repository / "licenses/Bird-LICENSE.txt", dependencies_dir)
     checkouts = repository / ".build/checkouts"
     for dependency in ("swift-argument-parser", "swift-crypto", "swift-asn1"):
         license_file = checkouts / dependency / "LICENSE.txt"

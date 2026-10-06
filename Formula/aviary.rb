@@ -18,6 +18,7 @@ class Aviary < Formula
     odie "Expected one XClient resource bundle" unless bundles.length == 1
     (libexec/"bin").install bundles.first
     (libexec/"share/doc/aviary").install "THIRD_PARTY_NOTICES.md"
+    (libexec/"share/doc/aviary/dependencies").install "licenses/Bird-LICENSE.txt"
     bin.install_symlink libexec/"bin/aviary"
   end
 
