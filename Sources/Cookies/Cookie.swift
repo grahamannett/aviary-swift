@@ -36,6 +36,14 @@ public enum BrowserName: String, Sendable, CaseIterable {
     case safari
     case chrome
     case firefox
+
+    public static var defaultCookieSources: [BrowserName] {
+        #if os(macOS)
+        return [.safari, .chrome, .firefox]
+        #else
+        return [.chrome, .firefox]
+        #endif
+    }
 }
 
 public struct TwitterCookies: Sendable {

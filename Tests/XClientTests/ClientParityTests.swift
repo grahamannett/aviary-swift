@@ -1,5 +1,8 @@
 import XCTest
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Cookies
 @testable import XClient
 

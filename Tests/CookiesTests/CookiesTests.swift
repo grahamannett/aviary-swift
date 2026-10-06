@@ -1,14 +1,16 @@
 import Foundation
-import SQLite3
+import CSQLite
 import XCTest
 @testable import Cookies
 
 private actor CookieRecorder {
     private(set) var calls: [BrowserName] = []
+    private(set) var timeouts: [Double?] = []
     let fixtures: [BrowserName: [Cookie]]
     init(_ fixtures: [BrowserName: [Cookie]] = [:]) { self.fixtures = fixtures }
-    func read(_ browser: BrowserName, _: String?, _: String?, _: Double?) -> (cookies: [Cookie], warnings: [String]) {
+    func read(_ browser: BrowserName, _: String?, _: String?, _ timeout: Double?) -> (cookies: [Cookie], warnings: [String]) {
         calls.append(browser)
+        timeouts.append(timeout)
         return (fixtures[browser] ?? [], [])
     }
 }
@@ -73,8 +75,10 @@ final class CookiesTests: XCTestCase {
         XCTAssertEqual(result.ct0, "csrf-firefox")
         XCTAssertEqual(result.source, "Firefox default profile")
         let calls = await recorder.calls
-        XCTAssertEqual(calls, [.safari, .chrome, .firefox])
-        XCTAssertEqual(result.warnings.count, 2)
+        XCTAssertEqual(calls, BrowserName.defaultCookieSources)
+        XCTAssertEqual(result.warnings.count, BrowserName.defaultCookieSources.count - 1)
+        let timeouts = await recorder.timeouts
+        XCTAssertEqual(timeouts, Array(repeating: 30_000, count: BrowserName.defaultCookieSources.count))
     }
 
     func testEmptySourceListDoesNotReadBrowsersAndBlankCredentialsAreIncomplete() async {
@@ -291,9 +295,13 @@ final class CookiesTests: XCTestCase {
     }
 
     func testChromeEncryptedFixtureHashPrefixAndDuplicateOrder() throws {
-        // Independent Node crypto fixture: PBKDF2-SHA1(password, saltysalt, 1003, 16), AES-CBC with a space IV.
+        // Independent Node crypto fixtures: PBKDF2-SHA1(password, saltysalt,
+        // platform rounds, 16), AES-CBC with a space IV and a 32-byte hash prefix.
+        #if os(Linux)
+        let encrypted = "7631307c85eec015f7ccd901b24a3c7c7e21df94abcae88543b965b8eaf04d9b315c391206280087fae016ff49c5c4ff423103"
+        #else
         let encrypted = "763130e8628ff4effbd253b343d2f3d6557ac8ef9cee406d0deac75efde26b9949ce5aa5a1b9109637079993c85970c7003fc8"
-        XCTAssertEqual(ChromeCrypto.deriveAes128CbcKey(password: "fixture-password", iterations: 1003).map { String(format: "%02x", $0) }.joined(), "5d84e88b8d2628e23102b464d77a5bbd")
+        #endif
         let url = directory.appendingPathComponent("Cookies")
         let db = try database(url, sql: """
         CREATE TABLE meta(key TEXT, value TEXT);
@@ -324,11 +332,13 @@ final class CookiesTests: XCTestCase {
         )
         XCTAssertTrue(denied.cookies.isEmpty)
         XCTAssertTrue(denied.warnings.joined().contains("timeout"))
+        #if os(macOS)
         let empty = ChromeCookies.load(
             origins: origins, names: [], profile: url.path, timeoutMs: 1, environment: [:], roots: [],
             passwordReader: { _, _ in .success("") }
         )
         XCTAssertTrue(empty.warnings.joined().contains("empty"))
+        #endif
         let invalidDB = FirefoxCookies.load(origins: origins, names: [], profile: url.path, roots: [])
         XCTAssertTrue(invalidDB.cookies.isEmpty)
         XCTAssertTrue(invalidDB.warnings.joined().contains("moz_cookies"))
@@ -343,6 +353,7 @@ final class CookiesTests: XCTestCase {
         XCTAssertEqual(decoded.first?.secure, true)
         XCTAssertEqual(decoded.first?.httpOnly, true)
         XCTAssertNil(decoded.first?.expires)
+        #if os(macOS)
         let url = directory.appendingPathComponent("Cookies.binarycookies")
         try fixture.write(to: url)
         let filtered = SafariCookies.load(origins: origins, names: ["ct0"], paths: [url.path])
@@ -353,6 +364,11 @@ final class CookiesTests: XCTestCase {
         XCTAssertTrue(denied.warnings.joined().contains("Full Disk Access"))
         let missing = SafariCookies.load(origins: origins, names: [], paths: [directory.appendingPathComponent("missing").path])
         XCTAssertEqual(missing.warnings, ["Safari Cookies.binarycookies not found."])
+        #else
+        let unsupported = SafariCookies.load(origins: origins, names: [])
+        XCTAssertTrue(unsupported.cookies.isEmpty)
+        XCTAssertEqual(unsupported.warnings, ["Safari cookies are only available on macOS."])
+        #endif
     }
 
     func testMalformedSafariDataIsRejectedWithoutTrapping() throws {
@@ -367,7 +383,11 @@ final class CookiesTests: XCTestCase {
         try truncated.write(to: url)
         let result = SafariCookies.load(origins: origins, names: [], paths: [url.path])
         XCTAssertTrue(result.cookies.isEmpty)
+        #if os(macOS)
         XCTAssertTrue(result.warnings.joined().contains("Truncated"))
+        #else
+        XCTAssertEqual(result.warnings, ["Safari cookies are only available on macOS."])
+        #endif
     }
 
     func testChromeRejectsMalformedPKCS7Padding() {
@@ -381,6 +401,141 @@ final class CookiesTests: XCTestCase {
         encrypted[3 + 16 + 14] ^= 1
         let key = ChromeCrypto.deriveAes128CbcKey(password: "fixture-password", iterations: 1003)
         XCTAssertNil(ChromeCrypto.decryptAes128Cbc(encryptedValue: encrypted, keys: [key], stripHashPrefix: true))
+    }
+
+    func testPBKDF2AndChromeCbcIndependentVectorsOnEveryPlatform() {
+        // RFC 6070 PBKDF2-HMAC-SHA1 vectors, followed by independent Node
+        // crypto fixtures for both existing Chrome cookie key derivations.
+        XCTAssertEqual(hex(ChromeCrypto.pbkdf2SHA1(password: "password", salt: Data("salt".utf8), iterations: 1, keyLength: 20)), "0c60c80f961f0e71f3a9b524af6012062fe037a6")
+        XCTAssertEqual(hex(ChromeCrypto.pbkdf2SHA1(password: "password", salt: Data("salt".utf8), iterations: 2, keyLength: 20)), "ea6c014dc72d6f8ccd1ed92ace1d41f0d8de8957")
+        let fixtures = [
+            (1, "b0869219efa7a3882db045fb68f43b42", "7631307c85eec015f7ccd901b24a3c7c7e21df94abcae88543b965b8eaf04d9b315c391206280087fae016ff49c5c4ff423103"),
+            (1003, "5d84e88b8d2628e23102b464d77a5bbd", "763130e8628ff4effbd253b343d2f3d6557ac8ef9cee406d0deac75efde26b9949ce5aa5a1b9109637079993c85970c7003fc8"),
+        ]
+        for (rounds, expectedKey, encrypted) in fixtures {
+            let key = ChromeCrypto.deriveAes128CbcKey(password: "fixture-password", iterations: rounds)
+            XCTAssertEqual(hex(key), expectedKey)
+            XCTAssertEqual(ChromeCrypto.decryptAes128Cbc(encryptedValue: unhex(encrypted), keys: [key], stripHashPrefix: true), "fixture-auth")
+            XCTAssertNil(ChromeCrypto.decryptAes128Cbc(encryptedValue: unhex(encrypted).dropLast(), keys: [key], stripHashPrefix: true))
+        }
+    }
+
+    func testLinuxKeyringChecksLaunchExitAndEmptyOutputWithoutExposingSecrets() throws {
+        let absent = LinuxKeyring.readPassword(timeoutMs: 100, executableURL: directory.appendingPathComponent("missing-secret-tool"))
+        XCTAssertTrue(keyringError(absent).contains("could not be started"))
+        let shell = URL(fileURLWithPath: "/bin/sh")
+        let nonzero = LinuxKeyring.readPassword(
+            timeoutMs: 1000, executableURL: shell,
+            arguments: ["-c", "printf private-password; printf private-stderr >&2; exit 9"]
+        )
+        let message = keyringError(nonzero)
+        XCTAssertTrue(message.contains("status 9"))
+        XCTAssertFalse(message.contains("private"))
+        let empty = LinuxKeyring.readPassword(timeoutMs: 1000, executableURL: shell, arguments: ["-c", "printf '  '"])
+        XCTAssertTrue(keyringError(empty).contains("no password"))
+        let success = LinuxKeyring.readPassword(timeoutMs: 1000, executableURL: shell, arguments: ["-c", "printf 'fixture-password\\n'"])
+        XCTAssertEqual(try success.get(), "fixture-password")
+    }
+
+    func testLinuxKeyringTimeoutStopsAnUnresponsiveHelper() {
+        let start = ProcessInfo.processInfo.systemUptime
+        let result = LinuxKeyring.readPassword(
+            timeoutMs: 30, executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap '' TERM; while :; do :; done"]
+        )
+        XCTAssertTrue(keyringError(result).contains("timed out"))
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, 2)
+    }
+
+    #if os(Linux)
+    func testLinuxDefaultsAndExplicitSafariWarning() async {
+        XCTAssertEqual(BrowserName.defaultCookieSources, [.chrome, .firefox])
+        let result = await resolveTwitterCredentials(
+            authToken: nil, ct0: nil, cookieSource: [.safari], chromeProfile: nil,
+            firefoxProfile: nil, cookieTimeoutMs: nil, environment: [:]
+        )
+        XCTAssertFalse(result.isComplete)
+        XCTAssertTrue(result.warnings.contains("Safari cookies are only available on macOS."))
+        XCTAssertFalse(result.warnings.joined().contains("logged into x.com in Safari"))
+        XCTAssertFalse(result.warnings.joined().contains("Safari/Chrome/Firefox"))
+    }
+
+    func testLinuxChromeSafeStorageOverrideAndBasicStorageKeys() throws {
+        let url = directory.appendingPathComponent("Cookies")
+        let encrypted = "7631307c85eec015f7ccd901b24a3c7c7e21df94abcae88543b965b8eaf04d9b315c391206280087fae016ff49c5c4ff423103"
+        let db = try chromeDatabase(url, encrypted: encrypted, metaVersion: 24)
+        defer { sqlite3_close(db) }
+        let overridden = ChromeCookies.load(
+            origins: origins, names: [], profile: url.path, timeoutMs: 1,
+            environment: ["SWEET_COOKIE_CHROME_SAFE_STORAGE_PASSWORD": "fixture-password"], roots: []
+        )
+        XCTAssertTrue(overridden.warnings.isEmpty)
+        XCTAssertEqual(pickAuth(overridden.cookies)?.auth, "fixture-auth")
+        // Independently encrypted with peanuts and empty-password basic stores.
+        for basic in ["76313047fa48bab749c8ce1f50caba670847e1", "7631305f757c63304a78ed25740e436a9c1785"] {
+            XCTAssertEqual(sqlite3_exec(db, "UPDATE meta SET value='23'; UPDATE cookies SET encrypted_value=X'\(basic)' WHERE name='auth_token';", nil, nil, nil), SQLITE_OK)
+            let recovered = ChromeCookies.load(
+                origins: origins, names: [], profile: url.path, timeoutMs: 1,
+                environment: [:], roots: [], passwordReader: { _, _ in
+                    .failure(NSError(domain: "fixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "keyring unavailable"]))
+                }
+            )
+            XCTAssertEqual(pickAuth(recovered.cookies)?.auth, "basic-auth")
+            XCTAssertTrue(recovered.warnings.joined().contains("keyring unavailable"))
+            XCTAssertTrue(recovered.warnings.joined().contains("SWEET_COOKIE_CHROME_SAFE_STORAGE_PASSWORD"))
+        }
+    }
+
+    func testLinuxChromeKeyringFailureContinuesToFirefox() async throws {
+        let chromeURL = directory.appendingPathComponent("Cookies")
+        let db = try chromeDatabase(chromeURL, encrypted: "7631307c85eec015f7ccd901b24a3c7c7e21df94abcae88543b965b8eaf04d9b315c391206280087fae016ff49c5c4ff423103", metaVersion: 24)
+        defer { sqlite3_close(db) }
+        let chrome = ChromeCookies.load(
+            origins: origins, names: [], profile: chromeURL.path, timeoutMs: 1,
+            environment: [:], roots: [], passwordReader: { _, _ in
+                .failure(NSError(domain: "fixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "secret-tool timed out"]))
+            }
+        )
+        let firefoxCookies = pair("firefox")
+        let result = await resolveTwitterCredentials(
+            authToken: nil, ct0: nil, chromeProfile: nil, firefoxProfile: nil,
+            cookieTimeoutMs: 1, environment: [:], cookieProvider: { browser, _, _, _ in
+                browser == .chrome ? chrome : (firefoxCookies, [])
+            }
+        )
+        XCTAssertTrue(result.isComplete)
+        XCTAssertEqual(result.source, "Firefox default profile")
+        XCTAssertTrue(result.warnings.joined().contains("secret-tool timed out"))
+        XCTAssertFalse(result.warnings.joined().contains("fixture-password"))
+    }
+
+    private func chromeDatabase(_ url: URL, encrypted: String, metaVersion: Int) throws -> OpaquePointer {
+        try database(url, sql: """
+        CREATE TABLE meta(key TEXT, value TEXT);
+        INSERT INTO meta VALUES('version','\(metaVersion)');
+        CREATE TABLE cookies(name TEXT, value TEXT, host_key TEXT, path TEXT, expires_utc INTEGER, is_secure INTEGER, is_httponly INTEGER, encrypted_value BLOB);
+        INSERT INTO cookies VALUES('auth_token','','.x.com','/',0,1,1,X'\(encrypted)');
+        INSERT INTO cookies VALUES('ct0','session','.x.com','/',0,1,0,X'');
+        """)
+    }
+    #endif
+
+    private func keyringError(_ result: Result<String, NSError>) -> String {
+        switch result {
+        case .success: XCTFail("Expected a keyring failure"); return ""
+        case .failure(let error): return error.localizedDescription
+        }
+    }
+
+    private func hex(_ value: Data) -> String {
+        value.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func unhex(_ value: String) -> Data {
+        let bytes = Array(value.utf8)
+        return Data(stride(from: 0, to: bytes.count, by: 2).map { offset in
+            UInt8(String(decoding: bytes[offset..<offset + 2], as: UTF8.self), radix: 16)!
+        })
     }
 
     func testSafariRejectsInvalidCookieStringOffsetsAndExpiration() throws {

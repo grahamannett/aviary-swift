@@ -1,8 +1,6 @@
 import Foundation
-#if canImport(CommonCrypto)
-import CommonCrypto
-#endif
 import Crypto
+import _CryptoExtras
 
 enum ChromeCrypto {
     static func deriveAes128CbcKey(password: String, iterations: Int) -> Data {
@@ -58,31 +56,16 @@ enum ChromeCrypto {
 
     private static func aes128CbcDecrypt(ciphertext: Data, key: Data) -> Data? {
         guard key.count == 16, !ciphertext.isEmpty, ciphertext.count % 16 == 0 else { return nil }
-        var out = Data(count: ciphertext.count)
-        var outLen: Int = 0
-        let iv = [UInt8](repeating: 0x20, count: 16)
-        let status: Int32 = out.withUnsafeMutableBytes { outPtr in
-            ciphertext.withUnsafeBytes { cipherPtr in
-                key.withUnsafeBytes { keyPtr in
-                    CCCrypt(
-                        CCOperation(kCCDecrypt),
-                        CCAlgorithm(kCCAlgorithmAES),
-                        0,
-                        keyPtr.baseAddress,
-                        key.count,
-                        iv,
-                        cipherPtr.baseAddress,
-                        ciphertext.count,
-                        outPtr.baseAddress,
-                        ciphertext.count,
-                        &outLen
-                    )
-                }
-            }
+        do {
+            let plain = try AES._CBC.decrypt(
+                ciphertext, using: SymmetricKey(data: key),
+                iv: AES._CBC.IV(ivBytes: [UInt8](repeating: 0x20, count: 16)),
+                noPadding: true
+            )
+            return removePkcs7(plain)
+        } catch {
+            return nil
         }
-        guard status == kCCSuccess else { return nil }
-        out.count = outLen
-        return removePkcs7(out)
     }
 
     private static func removePkcs7(_ value: Data) -> Data? {
@@ -99,26 +82,13 @@ enum ChromeCrypto {
     }
 
     static func pbkdf2SHA1(password: String, salt: Data, iterations: UInt32, keyLength: Int) -> Data {
-        var derived = Data(count: keyLength)
-        let passwordData = Data(password.utf8)
-        let result = derived.withUnsafeMutableBytes { derivedPtr in
-            passwordData.withUnsafeBytes { passPtr in
-                salt.withUnsafeBytes { saltPtr in
-                    CCKeyDerivationPBKDF(
-                        CCPBKDFAlgorithm(kCCPBKDF2),
-                        passPtr.bindMemory(to: Int8.self).baseAddress,
-                        passwordData.count,
-                        saltPtr.bindMemory(to: UInt8.self).baseAddress,
-                        salt.count,
-                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
-                        iterations,
-                        derivedPtr.bindMemory(to: UInt8.self).baseAddress,
-                        keyLength
-                    )
-                }
-            }
-        }
-        precondition(result == kCCSuccess)
-        return derived
+        precondition(iterations > 0 && keyLength > 0)
+        // Chrome's existing cookie format requires 1 (Linux) or 1003 (macOS)
+        // rounds; the normal overload deliberately rejects these legacy values.
+        let key = try! KDF.Insecure.PBKDF2.deriveKey(
+            from: Data(password.utf8), salt: salt, using: .insecureSHA1,
+            outputByteCount: keyLength, unsafeUncheckedRounds: Int(iterations)
+        )
+        return key.withUnsafeBytes { Data($0) }
     }
 }

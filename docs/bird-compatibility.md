@@ -1,6 +1,6 @@
 # Bird 0.8 compatibility
 
-The compatibility reference is the local Bird 0.8.0 distribution (`bird-copy`). The older 0.7.0 source checkout supplies additional test examples. Aviary remains a native Swift executable; Bird and Node.js are not runtime dependencies. Adapted code and fixtures retain the [upstream license notice](../THIRD_PARTY_NOTICES.md).
+The compatibility reference is the local Bird 0.8.0 distribution (`bird-copy`). The older 0.7.0 source checkout supplies additional test examples. Aviary remains a native Swift executable; Bird and Node.js are not runtime dependencies. Adapted code and fixtures retain the [upstream license](../licenses/Bird-LICENSE.txt) and [attribution](../THIRD_PARTY_NOTICES.md).
 
 ## Command matrix
 

@@ -1,5 +1,5 @@
 import Foundation
-import SQLite3
+import CSQLite
 
 enum SqliteHelper {
     static func snapshot(from dbPath: String) throws -> URL {

@@ -1,5 +1,5 @@
 min_version = "2025.8.0"
-# Swift comes from Xcode Command Line Tools / PATH (mise swift@5.10 is incompatible with this macOS SDK).
+# Swift 6.1+ comes from Xcode Command Line Tools / PATH or a Linux toolchain.
 
 [env]
 _.path = [".build/release", ".build/debug"]
@@ -13,11 +13,8 @@ alias = "deps"
 description = "Debug build of aviary"
 run = """
 swift build --product aviary
-BIN="$(swift build --product aviary --show-bin-path)/aviary"
-mkdir -p .build/debug
-[ "$BIN" -ef .build/debug/aviary ] || cp -f "$BIN" .build/debug/aviary
 """
-sources = ["Package.swift", "Sources/**/*.swift", "Sources/**/*.json"]
+sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
 outputs = [".build/debug/aviary"]
 alias = "d"
 
@@ -25,12 +22,10 @@ alias = "d"
 description = "Release build of aviary"
 run = """
 swift build -c release --product aviary
-BIN="$(swift build -c release --product aviary --show-bin-path)/aviary"
-mkdir -p .build/release
-[ "$BIN" -ef .build/release/aviary ] || cp -f "$BIN" .build/release/aviary
+swift build -c release --product AviarySelfTest
 """
-sources = ["Package.swift", "Sources/**/*.swift", "Sources/**/*.json"]
-outputs = [".build/release/aviary"]
+sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
+outputs = [".build/release/aviary", ".build/release/AviarySelfTest"]
 alias = "b"
 
 [tasks.test]
@@ -64,9 +59,9 @@ arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
 run = '"$MISE_PROJECT_ROOT/.build/release/aviary" ${usage_cli_args-}'
 
 [tasks.install]
-description = "Install release binary to ~/.local/bin/aviary"
+description = "Install the source build and its resources under ~/.local"
 depends = ["build"]
-run = 'mkdir -p "${MISE_INSTALL_PATH:-$HOME/.local/bin}" && cp -f "$MISE_PROJECT_ROOT/.build/release/aviary" "${MISE_INSTALL_PATH:-$HOME/.local/bin}/aviary"'
+run = '"$MISE_PROJECT_ROOT/scripts/install-local.sh" "$(swift build -c release --show-bin-path)" "${AVIARY_INSTALL_PREFIX:-$HOME/.local}"'
 
 [tasks.clean]
 description = "Remove Swift build artifacts"

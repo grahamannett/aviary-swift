@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 extension TwitterClient {
     public func uploadMedia(data: Data, mimeType: String, alt: String? = nil) async -> UploadMediaResult {
