@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project python
+#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Offline checks for release integrity and formula generation failures."""
 
 import contextlib

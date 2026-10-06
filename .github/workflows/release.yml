@@ -48,8 +48,8 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          uv run --no-project --python 3.12 python scripts/collect-checksums.py dist "$RELEASE_TAG"
-          uv run --no-project --python 3.12 python scripts/render-homebrew-formula.py \
+          uv run --no-project --python 3.14 python scripts/collect-checksums.py dist "$RELEASE_TAG"
+          uv run --no-project --python 3.14 python scripts/render-homebrew-formula.py \
             --version "$RELEASE_TAG" --checksums dist/SHA256SUMS \
             --repository "$GITHUB_REPOSITORY" --output dist/aviary.rb
       - name: Prepare draft release
@@ -103,13 +103,13 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          uv run --no-project --python 3.12 python scripts/validate-installers.py \
+          uv run --no-project --python 3.14 python scripts/validate-installers.py \
             --installer mise --version "$RELEASE_TAG" --archives-dir dist --repository "$GITHUB_REPOSITORY"
       - name: Validate Homebrew install, upgrade, bird symlink and uninstall
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          uv run --no-project --python 3.12 python scripts/validate-installers.py \
+          uv run --no-project --python 3.14 python scripts/validate-installers.py \
             --installer homebrew --version "$RELEASE_TAG" --archives-dir dist --repository "$GITHUB_REPOSITORY"
 
   publish:

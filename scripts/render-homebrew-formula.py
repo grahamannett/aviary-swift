@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project python
+#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Generate the binary Homebrew formula from a complete release SHA256SUMS."""
 
 import argparse

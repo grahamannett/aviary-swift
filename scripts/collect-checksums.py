@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project python
+#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Verify all four platform archives and write their complete SHA256SUMS."""
 
 import argparse

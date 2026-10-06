@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project python
+#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Validate installers against an isolated local mirror of real release artifacts.
 
 The previous-version fixture uses the same bytes under version 0.0.0, solely to
@@ -136,6 +136,9 @@ def validate(args):
                 raise RuntimeError("Installer validation refuses to modify an existing Aviary installation")
             tap = "aviary-validation/release"
             print(run("brew", "tap-new", tap, "--no-git"))
+            trust_supported = subprocess.run(["brew", "help", "trust"], cwd=work, env=env, capture_output=True).returncode == 0
+            if trust_supported:
+                print(run("brew", "trust", tap))
             tap_dir = Path(run("brew", "--repository", tap).strip())
             render = load_renderer()
             checksums = args.archives_dir / "SHA256SUMS"
@@ -152,8 +155,11 @@ def validate(args):
             bird = task_root / "bird"
             bird.symlink_to(prefix / "bin/aviary")
             print(run(bird, "query-ids", "--json"))
-            print(run("brew", "uninstall", f"{tap}/aviary"))
+            # Upgrade leaves the old keg because cleanup is disabled for this check.
+            print(run("brew", "uninstall", "--force", f"{tap}/aviary"))
             print(run("brew", "untap", tap))
+            if trust_supported:
+                print(run("brew", "untrust", tap))
     finally:
         server.shutdown()
         server.server_close()

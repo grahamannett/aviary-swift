@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project python
+#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Exercise a release after relocation, with isolated credentials and no X calls."""
 
 import argparse

@@ -13,7 +13,7 @@ elif [[ $# -eq 3 ]]; then
   tap_dir="$3"
   script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
   mkdir -p "$tap_dir/Formula"
-  uv run --no-project python "$script_dir/render-homebrew-formula.py" \
+  uv run --no-project --python 3.14 python "$script_dir/render-homebrew-formula.py" \
     --version "$version" --checksums "$checksums" --output "$tap_dir/Formula/aviary.rb"
 else
   echo "Usage: $0 VERSION SHA256SUMS TAP_DIRECTORY | --head TAP_DIRECTORY" >&2

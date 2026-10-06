@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project python
+#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Package an already-built Aviary executable and its relocatable dependencies."""
 
 import argparse

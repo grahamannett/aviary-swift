@@ -38,16 +38,16 @@ Upgrade with `brew upgrade aviary` or `mise upgrade github:grahamannett/aviary-s
 
 ## Build a release archive
 
-Build with Swift 6.1 or later; CI pins Swift 6.1.3. A release tag must match `aviary --version`. Linux builds use Ubuntu 22.04 to establish the glibc compatibility baseline, and require SQLite development headers, pkg-config, and patchelf. macOS builds target macOS 13.
+Build with Swift 6.1 or later; CI pins Swift 6.1.3. Ubuntu 22.04 ARM64 CI downloads the official native aarch64 toolchain, verifies its detached signature against the published Swift 6.x signing-key fingerprint, and checks the compiler version and target before building. Other runners use `swift-actions/setup-swift@v2`. Packaging and validation scripts use Python 3.14 through uv. The repository's `.python-version` sets the same default for local uv commands. A release tag must match `aviary --version`. Linux builds use Ubuntu 22.04 to establish the glibc compatibility baseline, and require SQLite development headers, pkg-config, and patchelf. macOS builds target macOS 13.
 
 ```sh
 swift test
 swift build -c release --product aviary
 swift build -c release --product AviarySelfTest
-uv run --no-project --python 3.12 python scripts/package-release.py \
+uv run --no-project --python 3.14 python scripts/package-release.py \
   --build-dir "$(swift build -c release --show-bin-path)" \
   --output-dir dist --version 0.8.0 --platform macos --arch arm64
-uv run --no-project --python 3.12 python scripts/smoke-release.py \
+uv run --no-project --python 3.14 python scripts/smoke-release.py \
   dist/aviary-0.8.0-macos-arm64.tar.gz
 ```
 
