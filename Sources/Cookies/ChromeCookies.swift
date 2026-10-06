@@ -19,23 +19,35 @@ enum ChromeCookies {
         }
         let keychain = keychainFor(dbPath: dbPath)
         let password: String
+        var warnings: [String] = []
         if let reader = passwordReader {
             switch reader(dbPath, timeoutMs) {
             case .success(let value): password = value
-            case .failure(let error): return ([], ["Failed to read macOS Keychain (\(keychain.label)): \(error.localizedDescription)"])
+            case .failure(let error):
+                #if os(Linux)
+                password = ""
+                warnings.append(linuxKeyringWarning(error))
+                #else
+                return ([], ["Failed to read macOS Keychain (\(keychain.label)): \(error.localizedDescription)"])
+                #endif
             }
         } else if let envName = envOverride(for: dbPath), let env = normalizedEnvironmentValue(environment[envName]) {
             password = env
         } else {
             #if os(macOS)
-            switch readKeychain(account: keychain.account, service: keychain.service, timeoutMs: timeoutMs ?? 3000) {
+            switch readKeychain(account: keychain.account, service: keychain.service, timeoutMs: timeoutMs ?? 30_000) {
             case .success(let pw):
                 password = pw
             case .failure(let err):
                 return ([], ["Failed to read macOS Keychain (\(keychain.label)): \(err.localizedDescription)"])
             }
             #elseif os(Linux)
-            password = linuxPassword(dbPath: dbPath)
+            switch LinuxKeyring.readPassword(timeoutMs: timeoutMs) {
+            case .success(let value): password = value
+            case .failure(let error):
+                password = ""
+                warnings.append(linuxKeyringWarning(error))
+            }
             #else
             return ([], ["Chrome cookie extraction is not supported on this platform."])
             #endif
@@ -92,9 +104,9 @@ enum ChromeCookies {
                     )
                 )
             }
-            return (deduplicateCookies(cookies), [])
+            return (deduplicateCookies(cookies), warnings)
         } catch {
-            return ([], ["Failed to read Chrome cookies: \(error.localizedDescription)"])
+            return ([], warnings + ["Failed to read Chrome cookies: \(error.localizedDescription)"])
         }
         #endif
     }
@@ -201,20 +213,8 @@ enum ChromeCookies {
     #endif
 
     #if os(Linux)
-    private static func linuxPassword(dbPath: String) -> String {
-        if let envName = envOverride(for: dbPath), let env = ProcessInfo.processInfo.environment[envName], !env.isEmpty {
-            return env
-        }
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/secret-tool")
-        proc.arguments = ["lookup", "application", "chrome"]
-        let out = Pipe()
-        proc.standardOutput = out
-        proc.standardError = Pipe()
-        try? proc.run()
-        proc.waitUntilExit()
-        return String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    private static func linuxKeyringWarning(_ error: NSError) -> String {
+        "Failed to read Linux Chrome keyring: \(error.localizedDescription) Trying Chrome basic-storage cookie keys; unlock the keyring, install libsecret-tools, provide SWEET_COOKIE_CHROME_SAFE_STORAGE_PASSWORD, or use Firefox/explicit credentials."
     }
     #endif
 }

@@ -76,13 +76,8 @@ public func resolveTwitterCredentials(
         return result
     }
 
-    let sources = cookieSource ?? [.safari, .chrome, .firefox]
-    #if os(macOS)
-    let defaultTimeout: Double? = 30_000
-    #else
-    let defaultTimeout: Double? = nil
-    #endif
-    let timeout = cookieTimeoutMs.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? defaultTimeout
+    let sources = cookieSource ?? BrowserName.defaultCookieSources
+    let timeout = cookieTimeoutMs.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? 30_000
     let resolvedChrome = chromeProfile ?? normalizedEnvironmentValue(environment["SWEET_COOKIE_CHROME_PROFILE"])
     let resolvedFirefox = firefoxProfile ?? normalizedEnvironmentValue(environment["SWEET_COOKIE_FIREFOX_PROFILE"])
     let provider: CookieProvider = cookieProvider ?? { source, chrome, firefox, timeout in
@@ -114,18 +109,21 @@ public func resolveTwitterCredentials(
         }
         switch source {
         case .safari:
+            #if os(macOS)
             result.warnings.append("No Twitter cookies found in Safari. Make sure you are logged into x.com in Safari.")
+            #endif
         case .chrome:
             result.warnings.append("No Twitter cookies found in Chrome. Make sure you are logged into x.com in Chrome.")
         case .firefox:
             result.warnings.append("No Twitter cookies found in Firefox. Make sure you are logged into x.com in Firefox and the profile exists.")
         }
     }
+    let availableBrowsers = BrowserName.defaultCookieSources.map { $0.rawValue.capitalized }.joined(separator: "/")
     if result.authToken == nil {
-        result.warnings.append("Missing auth_token - provide via --auth-token, AUTH_TOKEN env var, or login to x.com in Safari/Chrome/Firefox")
+        result.warnings.append("Missing auth_token - provide via --auth-token, AUTH_TOKEN env var, or login to x.com in \(availableBrowsers)")
     }
     if result.ct0 == nil {
-        result.warnings.append("Missing ct0 - provide via --ct0, CT0 env var, or login to x.com in Safari/Chrome/Firefox")
+        result.warnings.append("Missing ct0 - provide via --ct0, CT0 env var, or login to x.com in \(availableBrowsers)")
     }
     return result
 }

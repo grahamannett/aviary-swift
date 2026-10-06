@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require a stable semantic version tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_TYPE" != tag || ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only stable release tags matching vMAJOR.MINOR.PATCH may be published" >&2
+            exit 1
+          fi
+
+  build:
+    needs: validate-tag
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ github.ref_name }}
+
+  prepare:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: aviary-*
+          path: dist
+          merge-multiple: true
+      - name: Verify complete archives and generate release formula
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          uv run --no-project --python 3.12 python scripts/collect-checksums.py dist "$RELEASE_TAG"
+          uv run --no-project --python 3.12 python scripts/render-homebrew-formula.py \
+            --version "$RELEASE_TAG" --checksums dist/SHA256SUMS \
+            --repository "$GITHUB_REPOSITORY" --output dist/aviary.rb
+      - name: Prepare draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > release-state.json; then
+            if [[ "$(jq -r .isDraft release-state.json)" != true ]]; then
+              echo "Refusing to overwrite an already public release" >&2
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Aviary ${RELEASE_TAG#v}" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/SHA256SUMS dist/aviary.rb --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: |
+            dist/SHA256SUMS
+            dist/aviary.rb
+
+  installers:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - uses: jdx/mise-action@v3
+        with:
+          install: false
+          cache: false
+          env: false
+          export_path: false
+      - uses: Homebrew/actions/setup-homebrew@master
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: aviary-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+          path: dist
+      - name: Validate mise GitHub install, upgrade, bird rename and uninstall
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          uv run --no-project --python 3.12 python scripts/validate-installers.py \
+            --installer mise --version "$RELEASE_TAG" --archives-dir dist --repository "$GITHUB_REPOSITORY"
+      - name: Validate Homebrew install, upgrade, bird symlink and uninstall
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          uv run --no-project --python 3.12 python scripts/validate-installers.py \
+            --installer homebrew --version "$RELEASE_TAG" --archives-dir dist --repository "$GITHUB_REPOSITORY"
+
+  publish:
+    needs: [prepare, installers]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish validated release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  update-tap:
+    needs: publish
+    runs-on: ubuntu-24.04
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+      - name: Report missing tap credential
+        if: env.HOMEBREW_TAP_TOKEN == ''
+        run: echo '::warning::Release published; configure HOMEBREW_TAP_TOKEN to update grahamannett/homebrew-tap automatically. The generated aviary.rb is attached to the release.'
+      - uses: actions/checkout@v4
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        with:
+          repository: grahamannett/homebrew-tap
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      - uses: actions/download-artifact@v4
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        with:
+          name: release-manifest
+          path: dist
+      - name: Update formula from release checksums
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          bash scripts/bootstrap-homebrew-tap.sh "$RELEASE_TAG" dist/SHA256SUMS homebrew-tap
+          git -C homebrew-tap config user.name github-actions[bot]
+          git -C homebrew-tap config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C homebrew-tap add Formula/aviary.rb README.md
+          if ! git -C homebrew-tap diff --cached --quiet; then
+            git -C homebrew-tap commit -m "Update aviary to ${RELEASE_TAG#v}"
+            git -C homebrew-tap push
+          fi

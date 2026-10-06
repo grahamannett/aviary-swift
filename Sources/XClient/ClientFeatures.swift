@@ -39,8 +39,7 @@ public enum ClientFeatures {
     }
 
     public static func overrides(environment env: [String: String] = ProcessInfo.processInfo.environment) -> [String: Any] {
-        let bundled = Bundle.module.url(forResource: "features", withExtension: "json", subdirectory: "Resources")
-            ?? Bundle.module.url(forResource: "features", withExtension: "json")
+        let bundled = ClientResources.url(for: "features", extension: "json")
         var result = bundled.map { read($0.path) } ?? [:]
         let legacy = nonempty(env["BIRD_FEATURES_CACHE"]) ?? nonempty(env["BIRD_FEATURES_PATH"]) ?? "\(configRoot(environment: env))/bird/features.json"
         result = merge(result, read(legacy))

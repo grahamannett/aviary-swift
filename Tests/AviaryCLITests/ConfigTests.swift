@@ -1,4 +1,5 @@
 import Foundation
+import Cookies
 import XCTest
 @testable import AviaryCLI
 
@@ -51,7 +52,7 @@ final class ConfigTests: XCTestCase {
         )
         XCTAssertNil(config.chromeProfileDir)
         XCTAssertEqual(config.chromeProfile, "Profile 1")
-        XCTAssertEqual(try config.resolveCookieSources(cli: []), [.safari, .chrome, .firefox])
+        XCTAssertEqual(try config.resolveCookieSources(cli: []), BrowserName.defaultCookieSources)
         XCTAssertEqual(config.resolveTimeout(cli: "0", env: "300.5"), 300.5)
         XCTAssertEqual(config.resolveCookieTimeout(cli: "invalid", env: "400"), 22.5)
         XCTAssertEqual(config.resolveQuoteDepth(cli: "-5", env: "3"), 3)
@@ -96,7 +97,7 @@ final class ConfigTests: XCTestCase {
         var warnings: [String] = []
         let config = try load(warn: { warnings.append($0) })
         XCTAssertTrue(warnings.isEmpty)
-        XCTAssertEqual(try config.resolveCookieSources(cli: []), [.safari, .chrome, .firefox])
+        XCTAssertEqual(try config.resolveCookieSources(cli: []), BrowserName.defaultCookieSources)
         XCTAssertNil(config.resolveTimeout(cli: nil, env: nil))
         XCTAssertNil(config.resolveCookieTimeout(cli: nil, env: nil))
         XCTAssertNil(config.resolveQuoteDepth(cli: nil, env: nil))

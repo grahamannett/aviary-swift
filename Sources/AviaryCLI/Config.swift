@@ -41,7 +41,7 @@ struct BirdConfig {
             default: raw = []
             }
         }
-        if raw.isEmpty { return [.safari, .chrome, .firefox] }
+        if raw.isEmpty { return BrowserName.defaultCookieSources }
         return try raw.map { value in
             let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard let browser = BrowserName(rawValue: normalized) else {

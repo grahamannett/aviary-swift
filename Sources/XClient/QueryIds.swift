@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public let fallbackQueryIds: [String: String] = [
     "CreateTweet": "TAJw1rBsjAtdNgTdlo2oeg",
@@ -35,8 +38,7 @@ public let fallbackQueryIds: [String: String] = [
 
 public func bakedQueryIds() -> [String: String] {
     var ids = fallbackQueryIds
-    if let url = Bundle.module.url(forResource: "query-ids", withExtension: "json", subdirectory: "Resources")
-        ?? Bundle.module.url(forResource: "query-ids", withExtension: "json"),
+    if let url = ClientResources.url(for: "query-ids", extension: "json"),
        let data = try? Data(contentsOf: url),
        let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String]
     {
@@ -219,8 +221,7 @@ public actor QueryIdStore {
         let ns = js as NSString
         for (pat, opG, idG) in patterns {
             guard let re = try? NSRegularExpression(pattern: pat) else { continue }
-            re.enumerateMatches(in: js, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
-                guard let m else { return }
+            for m in re.matches(in: js, range: NSRange(location: 0, length: ns.length)) {
                 let op = ns.substring(with: m.range(at: opG))
                 let qid = ns.substring(with: m.range(at: idG))
                 if fallbackQueryIds.keys.contains(op), found[op] == nil, qid.range(of: #"^[a-zA-Z0-9_-]+$"#, options: .regularExpression) != nil {

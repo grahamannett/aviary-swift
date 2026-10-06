@@ -2,6 +2,9 @@ import XCTest
 import Cookies
 import XClient
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 final class MockSession: HTTPSession, @unchecked Sendable {
     var handler: (URLRequest) -> (Data, HTTPURLResponse)

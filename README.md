@@ -1,14 +1,28 @@
 # aviary-swift
 
-A macOS CLI for reading and posting on X, written in Swift. Aims to match Bird 0.8's commands and output. No Node.js or Bun required.
+A CLI for reading and posting on X, written in Swift. Matches Bird 0.8's commands and output on macOS and Linux. No Node.js or Bun required.
 
-## Requirements
+## Install
 
-- macOS 13+
-- Swift 5.10+ (Xcode Command Line Tools)
+Published releases provide Apple Silicon and Intel macOS binaries, and arm64 and x86_64 Linux binaries for Ubuntu 22.04/24.04 and Debian 12. Prebuilt releases do not require a Swift compiler.
+
+Once the first release and tap are published:
+
+```bash
+brew install grahamannett/tap/aviary
+# Or use mise:
+mise use -g github:grahamannett/aviary-swift@latest
+aviary --help
+```
+
+See [distribution](docs/distribution.md) for release setup, manual downloads, supported Linux browser profiles, and optional `bird` compatibility. Installing Aviary does not replace existing Bird executables automatically.
+
+## Build from source
+
+- macOS 13+ or a supported Linux distribution
+- Swift 6.1+ (Xcode Command Line Tools on macOS, or the Swift Linux toolchain)
+- On Linux: SQLite development headers and `pkg-config` (`sudo apt install libsqlite3-dev pkg-config`)
 - [mise](https://mise.jdx.dev/) for the tasks in `mise.toml`
-
-## Build and run
 
 ```bash
 mise run test
@@ -17,18 +31,20 @@ mise run aviary -- --help
 mise run aviary -- --cookie-source chrome whoami
 ```
 
-The binary is at `.build/release/aviary`. Tests run offline with fixtures; they don't access your browser cookies or X account.
+The binary is at `.build/release/aviary`. Its adjacent `Aviary_XClient.bundle` (macOS) or `Aviary_XClient.resources` (Linux) must accompany it. `mise run install` installs the source build and resources under `~/.local`; set `AVIARY_INSTALL_PREFIX` to choose another prefix. Source-built Linux installs use your existing Swift runtime; downloadable Linux releases bundle that runtime. Tests run offline with fixtures; they don't access your browser cookies or X account.
 
 ## Authentication and config
 
-Aviary reads login cookies from Safari, Chrome, or Firefox. Use `--cookie-source` to choose a browser, or pass `--auth-token` and `--ct0` directly. Safari may require Full Disk Access for your terminal.
+Aviary reads login cookies from Safari, Chrome, or Firefox on macOS, and Chrome or Firefox on Linux. Use `--cookie-source` to choose a browser, or pass `--auth-token` and `--ct0` directly. Safari may require Full Disk Access for your terminal. Linux Chrome uses `secret-tool` from `libsecret-tools` for desktop keyring access; Firefox and explicit credentials also work on headless systems.
 
 Reads Bird config from `~/.config/bird/config.json5` and `./.birdrc.json5`. Caches are separate, under `$XDG_CONFIG_HOME/aviary` or `~/.config/aviary`.
 
 See [Bird compatibility](docs/bird-compatibility.md) for command coverage and differences. For scripts: `read --json` returns one object, not an array; paginated results include `nextCursor`.
 
-## Homebrew (local formula)
+## Homebrew source bootstrap
+
+Before prebuilt releases are available, the source formula requires macOS and Xcode 16.3+:
 
 ```bash
-brew install --build-from-source Formula/aviary.rb
+brew install --HEAD Formula/aviary.rb
 ```

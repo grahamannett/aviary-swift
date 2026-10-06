@@ -1,5 +1,12 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.1
 import PackageDescription
+
+#if os(macOS)
+// Use the macOS SDK's SQLite, rather than a build machine's Homebrew library.
+let sqlitePkgConfig: String? = nil
+#else
+let sqlitePkgConfig: String? = "sqlite3"
+#endif
 
 let package = Package(
     name: "Aviary",
@@ -10,17 +17,21 @@ let package = Package(
         .executable(name: "aviary", targets: ["Aviary"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(url: "https://github.com/apple/swift-crypto", from: "3.0.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2"),
+        .package(url: "https://github.com/apple/swift-crypto", exact: "3.15.1"),
     ],
     targets: [
+        .systemLibrary(
+            name: "CSQLite",
+            pkgConfig: sqlitePkgConfig,
+            providers: [.apt(["libsqlite3-dev"]), .brew(["sqlite"])]
+        ),
         .target(
             name: "Cookies",
             dependencies: [
+                "CSQLite",
                 .product(name: "Crypto", package: "swift-crypto"),
-            ],
-            linkerSettings: [
-                .linkedLibrary("sqlite3"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
             ]
         ),
         .target(
@@ -47,8 +58,9 @@ let package = Package(
             name: "AviarySelfTest",
             dependencies: ["Cookies", "XClient", "AviaryCLI"]
         ),
-        .testTarget(name: "CookiesTests", dependencies: ["Cookies"]),
+        .testTarget(name: "CookiesTests", dependencies: ["Cookies", "CSQLite", .product(name: "Crypto", package: "swift-crypto"), .product(name: "_CryptoExtras", package: "swift-crypto")]),
         .testTarget(name: "XClientTests", dependencies: ["XClient", "Cookies"], resources: [.copy("Fixtures")]),
         .testTarget(name: "AviaryCLITests", dependencies: ["AviaryCLI", "XClient", "Cookies"], resources: [.copy("Fixtures")]),
-    ]
+    ],
+    swiftLanguageModes: [.v5]
 )

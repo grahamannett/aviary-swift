@@ -1,7 +1,16 @@
 import AviaryCLI
 import Cookies
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import XClient
 
 final class MockSession: HTTPSession, @unchecked Sendable {
@@ -21,6 +30,20 @@ func expect(_ cond: Bool, _ msg: String) {
     } else {
         print("ok \(msg)")
     }
+}
+
+func checkBundledResources() {
+    expect(bakedQueryIds()["CreateTweet"] == "nmdAQXJDxw6-0KKF2on7eA", "bundled query IDs")
+    let emptyCache = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+    let overrides = ClientFeatures.overrides(environment: ["AVIARY_FEATURES_CACHE": emptyCache, "BIRD_FEATURES_CACHE": emptyCache])
+    let global = overrides["global"] as? [String: Bool]
+    expect(global?["post_ctas_fetch_enabled"] == true && global?["responsive_web_grok_annotations_enabled"] == false,
+           "bundled feature switches")
+}
+
+checkBundledResources()
+if CommandLine.arguments.dropFirst().contains("--resources-only") {
+    exit(failed == 0 ? 0 : 1)
 }
 
 func tweet(_ id: String, _ username: String, parent: String? = nil, created: String = "2026-01-01T00:00:00Z") -> TweetData {

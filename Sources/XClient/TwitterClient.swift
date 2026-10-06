@@ -1,5 +1,8 @@
 import Cookies
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 struct GraphResponse {
     var json: [String: Any]?
