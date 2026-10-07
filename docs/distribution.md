@@ -13,22 +13,40 @@ Both managers install the complete archive. Copying only the executable loses it
 
 ## Optional Bird command
 
-For Homebrew, put a symlink on your shell's PATH:
+With mise 2026.10.3 or newer, use a command wrapper in your global mise configuration. This keeps both `aviary` and `bird` available and follows the selected Aviary version:
+
+```toml
+[tools]
+"github:grahamannett/aviary-swift" = "0.1.0"
+
+[wrappers]
+bird = "aviary"
+```
+
+Run `mise install github:grahamannett/aviary-swift` and `mise reshim`. Interactive shells can use `mise activate`; scripts and agents need mise's `command-wrappers/bin` and `shims` directories on PATH before other Bird installations. With the default mise data directory, these are `~/.local/share/mise/command-wrappers/bin` and `~/.local/share/mise/shims`. Check `type -a bird`, `bird --version`, `aviary --version`, and `bird query-ids --json`. Use generic `bird` in skills and scripts so they follow this routing.
+
+To retain original Bird as an explicit backup, point another wrapper at its existing executable. For example, if original Bird is installed by Homebrew on Apple Silicon:
+
+```toml
+[wrappers]
+bird = "aviary"
+bird-original = "/opt/homebrew/bin/bird"
+```
+
+Remove the original Bird tool from mise's active configuration if present, while retaining its installation, and run `mise reshim`. Verify `bird-original --version`. Backup use is explicit; do not automatically retry failed commands through original Bird. Aviary accepts existing Bird config files and keeps separate caches. To restore original Bird as the default, change the `bird` wrapper target to its absolute executable path and run `mise reshim`.
+
+For a Homebrew Aviary installation without mise, an executable symlink in `~/.local/bin` also works:
 
 ```sh
 mkdir -p "$HOME/.local/bin"
 ln -s "$(brew --prefix aviary)/bin/aviary" "$HOME/.local/bin/bird"
 ```
 
-If that path already contains a file, inspect it before replacing it. Use `trash` to remove an identified stale file. For mise, use an exact executable rename in your global configuration:
+Inspect an existing destination before replacing it; use `trash` for an identified stale file or to remove the optional symlink.
 
-```toml
-[tools."github:grahamannett/aviary-swift"]
-version = "0.1.0"
-rename_exe = { aviary = "bird" }
-```
+## Local development
 
-Run `mise install`; if that version is already installed, use `mise install --force github:grahamannett/aviary-swift` to apply the rename. Remove the old Bird package with its original manager and run `mise reshim` if you use shims. Check `type -a bird`, `bird --version`, and `bird query-ids --json`. Both names load Aviary's resources and accept existing Bird config files. Aviary keeps separate caches. To remove the optional Homebrew symlink, use `trash "$HOME/.local/bin/bird"`.
+The project configuration leaves released `aviary` and `bird` commands on PATH. Run `mise run aviary -- --help` to build and execute the local release binary, or `mise run run -- --help` for the debug binary. To build without running, use `mise run build` or `mise run build-debug`; the executables and their resources stay in `.build`.
 
 ## CI and releases
 
