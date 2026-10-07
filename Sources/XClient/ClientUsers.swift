@@ -46,7 +46,7 @@ extension TwitterClient {
         var lastError = "Could not determine current user from response"
         for url in candidates {
             do {
-                let (data, response) = try await request(URL(string: url)!)
+                let (data, response) = try await request(URL(string: url)!, extra: ["content-type": "application/json"])
                 let parsed = parseGraph(data, response, operation: "CurrentUser", allowPartial: false)
                 guard parsed.success, let json = parsed.json else { lastError = parsed.error ?? lastError; continue }
                 let user = JSON.object(json["user"]) ?? json
@@ -59,7 +59,7 @@ extension TwitterClient {
         }
         for url in ["https://x.com/settings/account", "https://twitter.com/settings/account"] {
             do {
-                let (data, response) = try await request(URL(string: url)!)
+                let (data, response) = try await request(URL(string: url)!, headers: ["cookie": cookieHeader, "user-agent": Self.userAgent])
                 guard (200..<300).contains(response.statusCode) else { lastError = "HTTP \(response.statusCode) (settings page)"; continue }
                 let html = String(data: data, encoding: .utf8) ?? ""
                 if let username = capture(html, #""screen_name"\s*:\s*"([^"]+)""#), let id = capture(html, #""user_id"\s*:\s*"(\d+)""#) {

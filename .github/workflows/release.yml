@@ -61,6 +61,8 @@ jobs:
           swift test
           swift build -c release
       - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.23"
       - name: Package and check the archive
         run: |
           build_dir="$(swift build -c release --show-bin-path)"
@@ -70,10 +72,10 @@ jobs:
           if [[ "${{ matrix.platform }}" == linux ]]; then
             extra_args+=(--swift-runtime-license /usr/share/swift/LICENSE.txt)
           fi
-          uv run --no-project --python 3.14 python scripts/release.py package \
+          uv run --no-project --python 3.14.8 python scripts/release.py package \
             --build-dir "$build_dir" --output-dir dist --version "$version" \
             --platform "${{ matrix.platform }}" --arch "${{ matrix.arch }}" "${extra_args[@]}"
-          uv run --no-project --python 3.14 python scripts/release.py check \
+          uv run --no-project --python 3.14.8 python scripts/release.py check \
             "dist/aviary-$version-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
@@ -125,13 +127,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.23"
       - uses: actions/download-artifact@v4
         with:
           pattern: aviary-*
           path: dist
           merge-multiple: true
       - name: Prepare checksums and Homebrew formula
-        run: uv run --no-project --python 3.14 python scripts/release.py prepare dist "$RELEASE_TAG" --repository "$GITHUB_REPOSITORY"
+        run: uv run --no-project --python 3.14.8 python scripts/release.py prepare dist "$RELEASE_TAG" --repository "$GITHUB_REPOSITORY"
       - name: Publish complete release
         run: |
           if gh release view "$RELEASE_TAG" --json isDraft > release-state.json 2>/dev/null; then

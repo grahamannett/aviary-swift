@@ -1,7 +1,7 @@
 # Shared environment for the check:brew_* and check:mise_* tasks in mise.toml.
 [vars]
     root    = "{{ env.AVIARY_INSTALL_TEST_ROOT | default(value='/tmp/aviary-install-test') }}"
-    version = "{{ env.AVIARY_INSTALL_TEST_VERSION | default(value='0.1.0') }}"
+    version = "{{ env.AVIARY_INSTALL_TEST_VERSION | default(value='0.1.1') }}"
 
 [env]
     AVIARY_INSTALL_TEST_ROOT       = "{{ vars.root }}"

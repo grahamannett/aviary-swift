@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --no-project --python 3.14 python
+#!/usr/bin/env -S uv run --no-project --python 3.14.8 python
 """Package Aviary, prepare verified release metadata, and check relocated archives."""
 
 import argparse

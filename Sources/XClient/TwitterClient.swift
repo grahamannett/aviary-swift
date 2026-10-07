@@ -28,6 +28,7 @@ public actor TwitterClient {
 
     public static let bearer = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
     public static let graphqlBase = "https://x.com/i/api/graphql"
+    static let userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
     public init(cookies: TwitterCookies, timeoutMs: Double? = nil, quoteDepth: Int = 1,
                 session: HTTPSession = URLSessionHTTP(), queryIdStore: QueryIdStore = .shared,
@@ -57,19 +58,19 @@ public actor TwitterClient {
             "x-twitter-client-deviceid": clientDeviceId,
             "x-client-transaction-id": (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined(),
             "cookie": cookieHeader,
-            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "user-agent": Self.userAgent,
             "origin": "https://x.com", "referer": "https://x.com/",
         ]
         if let clientUserId { headers["x-twitter-client-user-id"] = clientUserId }
         return headers
     }
 
-    func request(_ url: URL, method: String = "GET", body: Data? = nil, extra: [String: String] = [:]) async throws -> (Data, HTTPURLResponse) {
+    func request(_ url: URL, method: String = "GET", body: Data? = nil, extra: [String: String] = [:], headers: [String: String]? = nil) async throws -> (Data, HTTPURLResponse) {
         guard !authToken.isEmpty, !ct0.isEmpty else { throw ClientError("Both authToken and ct0 cookies are required") }
         try Task.checkCancellation()
         var req = URLRequest(url: url)
         req.httpMethod = method
-        baseHeaders().merging(extra) { _, new in new }.forEach { req.setValue($0.value, forHTTPHeaderField: $0.key) }
+        (headers ?? baseHeaders()).merging(extra) { _, new in new }.forEach { req.setValue($0.value, forHTTPHeaderField: $0.key) }
         req.httpBody = body
         if let timeoutMs, timeoutMs > 0 { req.timeoutInterval = timeoutMs / 1000 }
         let (data, response) = try await session.data(for: req)

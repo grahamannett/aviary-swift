@@ -1,5 +1,9 @@
 min_version = "2025.8.0"
-# Swift 6.1+ comes from Xcode Command Line Tools / PATH or a Linux toolchain.
+# macOS still needs Xcode or Command Line Tools for the SDK.
+
+[tools]
+    swift = "6.3.3"
+    uv    = "0.12.23"
 
 [tasks.resolve]
     description = "Resolve Swift package dependencies"
@@ -8,21 +12,13 @@ min_version = "2025.8.0"
 
 [tasks.build-debug]
     description = "Debug build of aviary"
-    run = """
-swift build --product aviary
-"""
-    sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
-    outputs = [".build/debug/aviary"]
-    alias = "d"
+    run         = "swift build --product aviary"
+    alias       = "d"
 
 [tasks.build]
     description = "Release build of aviary"
-    run = """
-swift build -c release
-"""
-    sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
-    outputs = [".build/release/aviary", ".build/release/AviarySelfTest"]
-    alias = "b"
+    run         = "swift build -c release"
+    alias       = "b"
 
 [tasks.test]
     description = "Run unit tests"
@@ -64,7 +60,7 @@ arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
 
 [tasks.test-release-tooling]
     description = "Test archive metadata and license handling"
-    run         = "uv run --no-project --python 3.14 python -m unittest discover -s Tests/Distribution"
+    run         = "uv run --no-project --python 3.14.8 python -m unittest discover -s Tests/Distribution"
 
 [tasks."check:brew_install"]
     description = "Install Aviary with the shared installer-test environment"

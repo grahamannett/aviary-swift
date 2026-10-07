@@ -11,7 +11,7 @@ Install with Homebrew or mise:
 ```bash
 brew install grahamannett/tap/aviary
 # Or use mise:
-mise use -g github:grahamannett/aviary-swift@0.1.0
+mise use -g github:grahamannett/aviary-swift@0.1.1
 aviary --help
 ```
 
@@ -20,11 +20,12 @@ See [distribution](docs/distribution.md) for release setup, manual downloads, su
 ## Build from source
 
 - macOS 13+ or a supported Linux distribution
-- Swift 6.1+ (Xcode Command Line Tools on macOS, or the Swift Linux toolchain)
+- On macOS: Xcode or Command Line Tools for the macOS SDK
 - On Linux: SQLite development headers and `pkg-config` (`sudo apt install libsqlite3-dev pkg-config`)
-- [mise](https://mise.jdx.dev/) for the tasks in `mise.toml`
+- [mise](https://mise.jdx.dev/) for the pinned Swift 6.3.3 and uv 0.12.23 toolchains and tasks in `mise.toml`
 
 ```bash
+mise install swift uv
 mise run test
 mise run build
 mise run aviary -- --help
