@@ -1,9 +1,6 @@
 min_version = "2025.8.0"
 # Swift 6.1+ comes from Xcode Command Line Tools / PATH or a Linux toolchain.
 
-[env]
-    _.path = [".build/release", ".build/debug"]
-
 [tasks.resolve]
     description = "Resolve Swift package dependencies"
     run         = "swift package resolve"
