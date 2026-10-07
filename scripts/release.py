@@ -14,7 +14,6 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-
 SYSTEM_LIBRARIES = re.compile(
     r"^(?:ld-linux[^/]*|lib(?:c|m|pthread|rt|dl|resolv|util|anl)\.so(?:\..*)?)$"
 )
@@ -79,10 +78,14 @@ def validate_executable(binary, platform, arch):
         with binary.open("rb") as source:
             header = source.read(20)
         if header[:6] != b"\x7fELF\x02\x01":
-            raise RuntimeError(f"Expected a 64-bit little-endian Linux executable: {binary}")
+            raise RuntimeError(
+                f"Expected a 64-bit little-endian Linux executable: {binary}"
+            )
         machine = struct.unpack("<H", header[18:20])[0]
         if machine != {"arm64": 183, "x86_64": 62}[arch]:
-            raise RuntimeError(f"Executable architecture does not match {arch}: {binary}")
+            raise RuntimeError(
+                f"Executable architecture does not match {arch}: {binary}"
+            )
         return
     if run("lipo", "-archs", str(binary)).strip() != arch:
         raise RuntimeError(f"Executable architecture does not match {arch}: {binary}")
@@ -93,7 +96,9 @@ def validate_executable(binary, platform, arch):
     for line in run("otool", "-L", str(binary)).splitlines()[1:]:
         dependency = line.strip().split(" (", 1)[0]
         if not dependency.startswith(("/usr/lib/", "/System/Library/", "@rpath/")):
-            raise RuntimeError(f"macOS executable depends on a build-host library: {dependency}")
+            raise RuntimeError(
+                f"macOS executable depends on a build-host library: {dependency}"
+            )
 
 
 def bundle_linux_dependencies(binaries, destination, notices, swift_license):
@@ -218,7 +223,14 @@ def package(args):
     headers = set()
     for source in boring_ssl.rglob("*"):
         if source.is_file() and source.suffix in {
-            ".c", ".cc", ".cpp", ".h", ".S", ".s", ".asm", ".inc"
+            ".c",
+            ".cc",
+            ".cpp",
+            ".h",
+            ".S",
+            ".s",
+            ".asm",
+            ".inc",
         }:
             content = source.read_text(errors="replace")
             headers.update(copyright_bearing_comments(content))
@@ -254,9 +266,11 @@ def package(args):
         info.mtime = epoch
         return info
 
-    with archive.open("wb") as raw, gzip.GzipFile(
-        filename="", mode="wb", fileobj=raw, mtime=epoch
-    ) as compressed, tarfile.open(fileobj=compressed, mode="w") as tar:
+    with (
+        archive.open("wb") as raw,
+        gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=epoch) as compressed,
+        tarfile.open(fileobj=compressed, mode="w") as tar,
+    ):
         for path in sorted(staging.rglob("*")):
             tar.add(
                 path,
@@ -411,7 +425,9 @@ def check(archive):
     binary.rename(renamed)
     try:
         if json.loads(run(renamed, "query-ids", "--json")) != ids:
-            raise RuntimeError("Resource diagnostics changed after renaming aviary to bird")
+            raise RuntimeError(
+                "Resource diagnostics changed after renaming aviary to bird"
+            )
     finally:
         renamed.rename(binary)
     # Hide the shipped bundle. The diagnostic must fail even while source build resources exist.
@@ -447,7 +463,9 @@ def prepare(directory, version, repository="grahamannett/aviary-swift"):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    package_parser = commands.add_parser("package", help="Package prebuilt executables and resources")
+    package_parser = commands.add_parser(
+        "package", help="Package prebuilt executables and resources"
+    )
     package_parser.add_argument("--build-dir", type=Path, required=True)
     package_parser.add_argument("--output-dir", type=Path, required=True)
     package_parser.add_argument("--version", required=True)
@@ -457,11 +475,15 @@ def main(argv=None):
         "--repository-dir", type=Path, default=Path(__file__).resolve().parent.parent
     )
     package_parser.add_argument("--swift-runtime-license", type=Path)
-    prepare_parser = commands.add_parser("prepare", help="Verify four archives and generate release metadata")
+    prepare_parser = commands.add_parser(
+        "prepare", help="Verify four archives and generate release metadata"
+    )
     prepare_parser.add_argument("directory", type=Path)
     prepare_parser.add_argument("version")
     prepare_parser.add_argument("--repository", default="grahamannett/aviary-swift")
-    check_parser = commands.add_parser("check", help="Check resources, relocation, and bird compatibility")
+    check_parser = commands.add_parser(
+        "check", help="Check resources, relocation, and bird compatibility"
+    )
     check_parser.add_argument("archive", type=Path)
     args = parser.parse_args(argv)
     if args.command == "package":

@@ -2,74 +2,102 @@ min_version = "2025.8.0"
 # Swift 6.1+ comes from Xcode Command Line Tools / PATH or a Linux toolchain.
 
 [env]
-_.path = [".build/release", ".build/debug"]
+    _.path = [".build/release", ".build/debug"]
 
 [tasks.resolve]
-description = "Resolve Swift package dependencies"
-run = "swift package resolve"
-alias = "deps"
+    description = "Resolve Swift package dependencies"
+    run         = "swift package resolve"
+    alias       = "deps"
 
 [tasks.build-debug]
-description = "Debug build of aviary"
-run = """
+    description = "Debug build of aviary"
+    run = """
 swift build --product aviary
 """
-sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
-outputs = [".build/debug/aviary"]
-alias = "d"
+    sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
+    outputs = [".build/debug/aviary"]
+    alias = "d"
 
 [tasks.build]
-description = "Release build of aviary"
-run = """
+    description = "Release build of aviary"
+    run = """
 swift build -c release
 """
-sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
-outputs = [".build/release/aviary", ".build/release/AviarySelfTest"]
-alias = "b"
+    sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
+    outputs = [".build/release/aviary", ".build/release/AviarySelfTest"]
+    alias = "b"
 
 [tasks.test]
-description = "Run unit tests"
-run = "swift test"
-alias = "t"
+    description = "Run unit tests"
+    run         = "swift test"
+    alias       = "t"
 
 [tasks.test-filter]
-description = "Run tests matching an XCTest filter"
-usage = """
+    description = "Run tests matching an XCTest filter"
+    usage = """
 arg "<filter>" help="Test name filter passed to swift test --filter"
 """
-run = 'swift test --filter "${usage_filter}"'
+    run = 'swift test --filter "${usage_filter}"'
 
 [tasks.run]
-description = "Debug-build then run aviary with extra args (from caller cwd)"
-depends = ["build-debug"]
-dir = "{{cwd}}"
-usage = """
+    description = "Debug-build then run aviary with extra args (from caller cwd)"
+    depends = ["build-debug"]
+    dir = "{{cwd}}"
+    usage = """
 arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
 """
-run = '"$MISE_PROJECT_ROOT/.build/debug/aviary" ${usage_cli_args-}'
+    run = '"$MISE_PROJECT_ROOT/.build/debug/aviary" ${usage_cli_args-}'
 
 [tasks.aviary]
-description = "Release-build then run aviary with extra args"
-depends = ["build"]
-dir = "{{cwd}}"
-usage = """
+    description = "Release-build then run aviary with extra args"
+    depends = ["build"]
+    dir = "{{cwd}}"
+    usage = """
 arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
 """
-run = '"$MISE_PROJECT_ROOT/.build/release/aviary" ${usage_cli_args-}'
+    run = '"$MISE_PROJECT_ROOT/.build/release/aviary" ${usage_cli_args-}'
 
 [tasks.clean]
-description = "Remove Swift build artifacts"
-run = "swift package clean"
+    description = "Remove Swift build artifacts"
+    run         = "swift package clean"
 
 [tasks.ci]
-description = "Run Swift and release-tooling tests"
-depends = ["test", "test-release-tooling"]
+    description = "Run Swift and release-tooling tests"
+    depends     = ["test", "test-release-tooling"]
 
 [tasks.test-release-tooling]
-description = "Test archive metadata and license handling"
-run = "uv run --no-project --python 3.14 python -m unittest discover -s Tests/Distribution"
+    description = "Test archive metadata and license handling"
+    run         = "uv run --no-project --python 3.14 python -m unittest discover -s Tests/Distribution"
+
+[tasks."check:brew_install"]
+    description = "Install Aviary with the shared installer-test environment"
+    run         = "mise -E test run _brew_install"
+
+[tasks."check:brew_test"]
+    description = "Run Aviary's Homebrew formula tests"
+    run         = "mise -E test run _brew_test"
+
+[tasks."check:brew_uninstall"]
+    description = "Uninstall the Aviary Homebrew test installation"
+    run         = "mise -E test run _brew_uninstall"
+
+[tasks."check:brew_untap"]
+    description = "Untap the Homebrew tap added for testing"
+    run         = "mise -E test run _brew_untap"
+
+[tasks."check:mise_install"]
+    description = "Install Aviary in the temporary mise environment"
+    run         = "mise -E test run _mise_install"
+
+[tasks."check:mise_bird"]
+    description = "Apply the bird executable rename in the temporary mise environment"
+    run         = "mise -E test run _mise_bird"
+
+[tasks."check:mise_uninstall"]
+    description = "Uninstall Aviary from the temporary mise environment"
+    run         = "mise -E test run _mise_uninstall"
 
 [tasks.watch]
-description = "Rebuild debug binary on source changes"
-run = "mise watch build-debug"
-hide = true
+    description = "Rebuild debug binary on source changes"
+    run         = "mise watch build-debug"
+    hide        = true

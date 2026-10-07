@@ -11,7 +11,7 @@ Install with Homebrew or mise:
 ```bash
 brew install grahamannett/tap/aviary
 # Or use mise:
-mise use -g github:grahamannett/aviary-swift@latest
+mise use -g github:grahamannett/aviary-swift@0.1.0
 aviary --help
 ```
 

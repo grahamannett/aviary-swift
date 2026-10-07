@@ -6,10 +6,10 @@ Release packages target macOS 13+ and Ubuntu 22.04/24.04 or Debian 12, on arm64 
 
 ```sh
 brew install grahamannett/tap/aviary
-mise use -g github:grahamannett/aviary-swift@latest
+mise use -g github:grahamannett/aviary-swift@0.1.0
 ```
 
-Both managers install the complete archive. Copying only the executable loses its resource bundle and Linux runtime libraries. Upgrade with `brew upgrade aviary` or `mise upgrade github:grahamannett/aviary-swift`. Uninstall with `brew uninstall aviary` or `mise uninstall --all github:grahamannett/aviary-swift`; remove its mise config entry to stop reinstalling it.
+Both managers install the complete archive. Copying only the executable loses its resource bundle and Linux runtime libraries. The explicit mise version works immediately; current mise defaults exclude releases less than 24 hours old when resolving `@latest`. Upgrade with `brew upgrade aviary` or `mise upgrade --bump github:grahamannett/aviary-swift`. Uninstall with `brew uninstall aviary` or `mise uninstall --all github:grahamannett/aviary-swift`; remove its mise config entry to stop reinstalling it.
 
 ## Optional Bird command
 
@@ -24,7 +24,7 @@ If that path already contains a file, inspect it before replacing it. Use `trash
 
 ```toml
 [tools."github:grahamannett/aviary-swift"]
-version = "latest"
+version = "0.1.0"
 rename_exe = { aviary = "bird" }
 ```
 
@@ -55,7 +55,24 @@ uv run --no-project --python 3.14 python scripts/release.py prepare dist 0.1.0
 
 Linux packaging needs `libsqlite3-dev` and `patchelf`, and takes `--swift-runtime-license /usr/share/swift/LICENSE.txt` from the official Swift image. Archives include the executable, resource bundle, diagnostic helper, and dependency notices. Linux packaging bundles the non-glibc dependency closure and sets relative runtime search paths. The system loader and glibc stay supplied by the host. Packaging refuses to overwrite an existing archive; use a new output directory. Temporary validation directories stay available for inspection and can be removed with `trash`.
 
-Run the tooling unit tests with `mise run test-release-tooling`. Check Homebrew and mise installation using their public release commands.
+Run the tooling unit tests with `mise run test-release-tooling`.
+
+## Installer checks
+
+The `check:brew_*` and `check:mise_*` tasks use a shared environment in `mise.test.toml`, so each operation has a short, stable command to approve. HOME, config, data, and caches use `/tmp/aviary-install-test`; authentication and cache overrides are cleared.
+
+```sh
+mise run check:mise_install
+mise run check:mise_bird
+mise run check:mise_uninstall
+
+mise run check:brew_install
+mise run check:brew_test
+mise run check:brew_uninstall
+mise run check:brew_untap
+```
+
+The mise tasks affect only the temporary installation. Homebrew uses its normal system prefix. Set `AVIARY_INSTALL_TEST_VERSION` or `AVIARY_INSTALL_TEST_ROOT` to select a different release or temporary directory; the root must be an absolute path.
 
 ## Validation limits
 
