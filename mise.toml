@@ -64,6 +64,7 @@ arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
     description = "Test archive metadata and license handling"
     run         = "uv run --no-project --python 3.14.8 python -m unittest discover -s Tests/Distribution"
 
+# - All below are related to MISE_ENV=test
 [tasks."check:brew_install"]
     description = "Install Aviary with the shared installer-test environment"
     run         = "mise -E test run _brew_install"
