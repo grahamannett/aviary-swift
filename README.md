@@ -31,7 +31,7 @@ mise run aviary -- --help
 mise run aviary -- --cookie-source chrome whoami
 ```
 
-The binary is at `.build/release/aviary`. Its adjacent `Aviary_XClient.bundle` (macOS) or `Aviary_XClient.resources` (Linux) must accompany it. `mise run install` installs the source build and resources under `~/.local`; set `AVIARY_INSTALL_PREFIX` to choose another prefix. Source-built Linux installs use your existing Swift runtime; downloadable Linux releases bundle that runtime. Tests run offline with fixtures; they don't access your browser cookies or X account.
+The binary is at `.build/release/aviary`. Its adjacent `Aviary_XClient.bundle` (macOS) or `Aviary_XClient.resources` (Linux) must accompany it. Run source builds with `mise run aviary`; use Homebrew or mise's GitHub backend for installation. Source builds on Linux use your existing Swift runtime; downloadable Linux releases bundle that runtime. Tests run offline with fixtures; they don't access your browser cookies or X account.
 
 ## Authentication and config
 
@@ -40,11 +40,3 @@ Aviary reads login cookies from Safari, Chrome, or Firefox on macOS, and Chrome 
 Reads Bird config from `~/.config/bird/config.json5` and `./.birdrc.json5`. Caches are separate, under `$XDG_CONFIG_HOME/aviary` or `~/.config/aviary`.
 
 See [Bird compatibility](docs/bird-compatibility.md) for command coverage and differences. For scripts: `read --json` returns one object, not an array; paginated results include `nextCursor`.
-
-## Homebrew source bootstrap
-
-Before prebuilt releases are available, the source formula requires macOS and Xcode 16.3+:
-
-```bash
-brew install --HEAD Formula/aviary.rb
-```

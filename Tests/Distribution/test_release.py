@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --no-project --python 3.14 python
 """Offline checks for release integrity and formula generation failures."""
 
 import contextlib
@@ -6,20 +5,20 @@ import hashlib
 import importlib.util
 import io
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
 
-def module(filename):
-    spec = importlib.util.spec_from_file_location(filename.replace("-", "_"), Path(__file__).with_name(filename + ".py"))
-    result = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(result)
-    return result
+release_path = Path(__file__).resolve().parents[2] / "scripts" / "release.py"
+spec = importlib.util.spec_from_file_location("aviary_release", release_path)
+release = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = release
+spec.loader.exec_module(release)
 
-
-render = module("render-homebrew-formula").render
-collect = module("collect-checksums").collect
-copyright_comments = module("package-release").copyright_bearing_comments
+render = release.render
+collect = release.collect
+copyright_comments = release.copyright_bearing_comments
 
 
 class ReleaseIntegrityTests(unittest.TestCase):
