@@ -6,7 +6,7 @@ A CLI for reading and posting on X, written in Swift. Matches Bird 0.8's command
 
 Published releases provide Apple Silicon and Intel macOS binaries, and arm64 and x86_64 Linux binaries for Ubuntu 22.04/24.04 and Debian 12. Prebuilt releases do not require a Swift compiler.
 
-Once the first release and tap are published:
+Install with Homebrew or mise:
 
 ```bash
 brew install grahamannett/tap/aviary
