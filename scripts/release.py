@@ -14,11 +14,12 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+ARCHITECTURES = ("arm64", "x86_64")
+PLATFORMS = ("macos", "linux")
+
 SYSTEM_LIBRARIES = re.compile(
     r"^(?:ld-linux[^/]*|lib(?:c|m|pthread|rt|dl|resolv|util|anl)\.so(?:\..*)?)$"
 )
-PLATFORMS = ("macos", "linux")
-ARCHITECTURES = ("arm64", "x86_64")
 
 
 def version_number(value):

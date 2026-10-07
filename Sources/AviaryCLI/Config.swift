@@ -52,21 +52,28 @@ struct BirdConfig {
     }
 
     func resolveTimeout(cli: String?, env: String?) -> Double? {
-        Self.positiveNumber([cli.map(JSON5.Value.string), values["timeoutMs"], env.map(JSON5.Value.string)])
+        Self.positiveNumber([
+            cli.map(JSON5.Value.string), values["timeoutMs"], env.map(JSON5.Value.string),
+        ])
     }
 
     func resolveCookieTimeout(cli: String?, env: String?) -> Double? {
-        Self.positiveNumber([cli.map(JSON5.Value.string), values["cookieTimeoutMs"], env.map(JSON5.Value.string)])
+        Self.positiveNumber([
+            cli.map(JSON5.Value.string), values["cookieTimeoutMs"], env.map(JSON5.Value.string),
+        ])
     }
 
     func resolveQuoteDepth(cli: String?, env: String?) -> Int? {
-        for value in [cli.map(JSON5.Value.string), values["quoteDepth"], env.map(JSON5.Value.string)] {
+        for value in [
+            cli.map(JSON5.Value.string), values["quoteDepth"], env.map(JSON5.Value.string),
+        ] {
             let number: Double?
             switch value {
             case .number(let value): number = value
             case .string(let value):
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                let sign = trimmed.first == "+" || trimmed.first == "-" ? String(trimmed.prefix(1)) : ""
+                let sign =
+                    trimmed.first == "+" || trimmed.first == "-" ? String(trimmed.prefix(1)) : ""
                 let digits = trimmed.dropFirst(sign.count).prefix { $0.isASCII && $0.isNumber }
                 number = digits.isEmpty ? nil : Double(sign + String(digits))
             default: number = nil

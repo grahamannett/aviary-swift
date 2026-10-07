@@ -24,38 +24,40 @@
     AVIARY_SKIP_QUERY_ID_REFRESH   = "1"
     HOMEBREW_NO_AUTO_UPDATE        = "1"
     HOMEBREW_NO_INSTALL_CLEANUP    = "1"
+    INSTALL_BREW_TAP               = "grahamannett/tap"
+    INSTALL_MISE_PATH              = "github:grahamannett/aviary-swift"
 
 [tasks._brew_install]
     hide = true
     dir  = "/tmp"
-    run  = "brew install grahamannett/tap/aviary"
+    run  = "brew install $INSTALL_BREW_TAP/aviary"
 
 [tasks._brew_test]
     hide = true
     dir  = "/tmp"
-    run  = "brew test grahamannett/tap/aviary"
+    run  = "brew test $INSTALL_BREW_TAP/aviary"
 
 [tasks._brew_uninstall]
     hide = true
     dir  = "/tmp"
-    run  = "brew uninstall grahamannett/tap/aviary"
+    run  = "brew uninstall $INSTALL_BREW_TAP/aviary"
 
 [tasks._brew_untap]
     hide = true
     dir  = "/tmp"
-    run  = "brew untap grahamannett/tap"
+    run  = "brew untap $INSTALL_BREW_TAP"
 
 [tasks._mise_install]
     hide = true
     dir  = "/tmp"
-    run  = 'mise use -g "github:grahamannett/aviary-swift@$AVIARY_INSTALL_TEST_VERSION"'
+    run  = 'mise use -g "${INSTALL_MISE_PATH}@${AVIARY_INSTALL_TEST_VERSION}"'
 
 [tasks._mise_bird]
     hide = true
     dir  = "/tmp"
-    run  = '''mise use -g --force --tool-option 'rename_exe={ aviary = "bird" }' "github:grahamannett/aviary-swift@$AVIARY_INSTALL_TEST_VERSION"'''
+    run  = '''mise use -g --force --tool-option 'rename_exe={ aviary = "bird" }' "${INSTALL_MISE_PATH}@${AVIARY_INSTALL_TEST_VERSION}"'''
 
 [tasks._mise_uninstall]
     hide = true
     dir  = "/tmp"
-    run  = "mise uninstall --all github:grahamannett/aviary-swift"
+    run  = 'mise uninstall --all "${INSTALL_MISE_PATH}"'

@@ -2,8 +2,10 @@ min_version = "2025.8.0"
 # macOS still needs Xcode or Command Line Tools for the SDK.
 
 [tools]
-    swift = "6.3.3"
-    uv    = "0.12.23"
+    python = "3.14.8"
+    swift  = "6.3.3"
+    uv     = "0.12.23"
+
 
 [tasks.resolve]
     description = "Resolve Swift package dependencies"
