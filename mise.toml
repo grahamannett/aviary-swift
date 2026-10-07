@@ -21,8 +21,7 @@ alias = "d"
 [tasks.build]
 description = "Release build of aviary"
 run = """
-swift build -c release --product aviary
-swift build -c release --product AviarySelfTest
+swift build -c release
 """
 sources = ["Package.swift", "Package.resolved", "Sources/**/*"]
 outputs = [".build/release/aviary", ".build/release/AviarySelfTest"]
@@ -58,18 +57,17 @@ arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
 """
 run = '"$MISE_PROJECT_ROOT/.build/release/aviary" ${usage_cli_args-}'
 
-[tasks.install]
-description = "Install the source build and its resources under ~/.local"
-depends = ["build"]
-run = '"$MISE_PROJECT_ROOT/scripts/install-local.sh" "$(swift build -c release --show-bin-path)" "${AVIARY_INSTALL_PREFIX:-$HOME/.local}"'
-
 [tasks.clean]
 description = "Remove Swift build artifacts"
 run = "swift package clean"
 
 [tasks.ci]
-description = "Test then release-build"
-depends = ["test", "build"]
+description = "Run Swift and release-tooling tests"
+depends = ["test", "test-release-tooling"]
+
+[tasks.test-release-tooling]
+description = "Test archive metadata and license handling"
+run = "uv run --no-project --python 3.14 python -m unittest discover -s Tests/Distribution"
 
 [tasks.watch]
 description = "Rebuild debug binary on source changes"

@@ -1,28 +1,26 @@
 # Distribution
 
-Release packages target macOS 13+ and Ubuntu 22.04/24.04 or Debian 12, on arm64 and x86_64. Linux archives include the Swift runtime and other required shared libraries; users do not need a Swift compiler. Install system CA certificates for HTTPS requests. Browser credential extraction still requires a local browser profile and, for Chrome on Linux, an unlocked desktop keyring or a profile using basic password storage. Explicit `--auth-token` and `--ct0` credentials work on headless systems. Windows, Alpine Linux, and automatic Snap/Flatpak profile discovery are outside the initial support matrix.
+Release packages target macOS 13+ and Ubuntu 22.04/24.04 or Debian 12, on arm64 and x86_64. Linux archives include the Swift runtime and required shared libraries. Users do not need Swift or Python to run Aviary. Linux needs system CA certificates for HTTPS, and Chrome cookie extraction needs an unlocked desktop keyring or basic password storage. Firefox and explicit `--auth-token`/`--ct0` credentials also work on headless systems. Windows, Alpine, and automatic Snap/Flatpak profile discovery are outside the initial support matrix.
 
-## Install and replace Bird
-
-After the first binary release and tap update, install with either:
+## Install
 
 ```sh
 brew install grahamannett/tap/aviary
 mise use -g github:grahamannett/aviary-swift@latest
 ```
 
-Homebrew downloads the archive for the host OS and architecture, installs the complete archive into its private `libexec` directory, and exposes `aviary` through a symlink. mise's GitHub backend selects the platform archive and exposes its `bin` directory. Keep the complete installed tree: copying only the executable loses the resource bundle and Linux runtime libraries.
+Both managers install the complete archive. Copying only the executable loses its resource bundle and Linux runtime libraries. Upgrade with `brew upgrade aviary` or `mise upgrade github:grahamannett/aviary-swift`. Uninstall with `brew uninstall aviary` or `mise uninstall --all github:grahamannett/aviary-swift`; remove its mise config entry to stop reinstalling it.
 
-For Homebrew, an optional `bird` command can point to the installed Aviary executable:
+## Optional Bird command
+
+For Homebrew, put a symlink on your shell's PATH:
 
 ```sh
 mkdir -p "$HOME/.local/bin"
 ln -s "$(brew --prefix aviary)/bin/aviary" "$HOME/.local/bin/bird"
 ```
 
-Ensure `~/.local/bin` is on your shell's `PATH`. If a `bird` file already exists there, inspect it before replacing it. Use `trash` to remove a stale file that you have identified.
-
-For mise, use an exact executable rename in your global mise configuration instead of the default tool entry:
+If that path already contains a file, inspect it before replacing it. Use `trash` to remove an identified stale file. For mise, use an exact executable rename in your global configuration:
 
 ```toml
 [tools."github:grahamannett/aviary-swift"]
@@ -30,56 +28,35 @@ version = "latest"
 rename_exe = { aviary = "bird" }
 ```
 
-Run `mise install` after saving the configuration. If Aviary was already installed at that version, run `mise install --force github:grahamannett/aviary-swift` to apply the rename during extraction. Renaming exposes `bird` in place of `aviary` for that mise installation. Both invocation names load the same packaged resources and accept existing Bird config files; help identifies the application as Aviary.
+Run `mise install`; if that version is already installed, use `mise install --force github:grahamannett/aviary-swift` to apply the rename. Remove the old Bird package with its original manager and run `mise reshim` if you use shims. Check `type -a bird`, `bird --version`, and `bird query-ids --json`. Both names load Aviary's resources and accept existing Bird config files. Aviary keeps separate caches. To remove the optional Homebrew symlink, use `trash "$HOME/.local/bin/bird"`.
 
-Remove the old Bird package using whichever manager installed it, such as `mise uninstall bird` or `npm uninstall -g @steipete/bird`. Then run `mise reshim` if you use mise shims. Check `type -a bird`, `bird --version`, and `bird query-ids --json` to confirm command resolution and offline resource loading. Inspect existing shell aliases/functions if the old command still wins.
+## CI and releases
 
-Upgrade with `brew upgrade aviary` or `mise upgrade github:grahamannett/aviary-swift`. Uninstall with `brew uninstall aviary` or `mise uninstall --all github:grahamannett/aviary-swift`; remove its mise config entry to stop reinstalling it. Use `trash "$HOME/.local/bin/bird"` to remove the optional Homebrew symlink. User configs and caches remain in their existing locations.
+Normal CI runs the offline Swift tests on macOS ARM64 and Linux x86_64, plus the release-tooling unit tests. macOS uses the runner's preinstalled Xcode 16.3. Linux uses the official `swift:6.1.3-jammy` container, which already contains Swift. Both cache `.build`; neither downloads a separate Swift toolchain or creates release archives on every PR.
 
-## Build a release archive
+A stable `vMAJOR.MINOR.PATCH` tag runs the release workflow. It tests and builds all four native platforms, packages each archive, and checks relocation, bundled resources, symlinks, renamed executables, and missing-resource failures. Linux archives also run in Ubuntu 22.04/24.04 and Debian 12 containers with no network or Swift installation. The final job verifies all four checksums, generates the Homebrew formula, uploads a complete draft, and publishes it. Public releases are never overwritten.
 
-Build with Swift 6.1 or later; CI pins Swift 6.1.3. Ubuntu 22.04 ARM64 CI downloads the official native aarch64 toolchain, verifies its detached signature against the published Swift 6.x signing-key fingerprint, and checks the compiler version and target before building. Other runners use `swift-actions/setup-swift@v2`. Packaging and validation scripts use Python 3.14 through uv. The repository's `.python-version` sets the same default for local uv commands. A release tag must match `aviary --version`. Linux builds use Ubuntu 22.04 to establish the glibc compatibility baseline, and require SQLite development headers, pkg-config, and patchelf. macOS builds target macOS 13.
+The Homebrew formula lives in [grahamannett/homebrew-tap](https://github.com/grahamannett/homebrew-tap). Set `HOMEBREW_TAP_TOKEN` in Aviary's Actions secrets to a fine-grained token with contents write permission for that repository to enable automatic formula updates. Without it, commit the release's attached `aviary.rb` to the tap manually. No separate tap bootstrap or local installer is needed.
+
+## Release tooling
+
+`scripts/release.py` has three commands: `package` creates one platform archive; `check` validates an extracted archive offline; `prepare` verifies all four archives and writes `SHA256SUMS` and `aviary.rb`. It uses only Python's standard library, runs through uv, and selects Python 3.14. The other script, `generate-bird-fixtures.mjs`, maintains the Bird compatibility fixtures.
 
 ```sh
-swift test
-swift build -c release --product aviary
-swift build -c release --product AviarySelfTest
-uv run --no-project --python 3.14 python scripts/package-release.py \
+swift build -c release
+uv run --no-project --python 3.14 python scripts/release.py package \
   --build-dir "$(swift build -c release --show-bin-path)" \
-  --output-dir dist --version 0.8.0 --platform macos --arch arm64
-uv run --no-project --python 3.14 python scripts/smoke-release.py \
-  dist/aviary-0.8.0-macos-arm64.tar.gz
+  --output-dir dist --version 0.1.0 --platform macos --arch arm64
+uv run --no-project --python 3.14 python scripts/release.py check \
+  dist/aviary-0.1.0-macos-arm64.tar.gz
+# After collecting all four platform archives and their .sha256 files:
+uv run --no-project --python 3.14 python scripts/release.py prepare dist 0.1.0
 ```
 
-For Linux, set `--platform linux`, choose the native architecture, and supply `--swift-runtime-license /path/to/swift-LICENSE.txt`. Use the license from the matching Swift release. Packaging never overwrites an existing archive; use a new output directory for another build. Temporary staging and validation directories are retained for inspection and may be removed with `trash` afterward.
+Linux packaging needs `libsqlite3-dev` and `patchelf`, and takes `--swift-runtime-license /usr/share/swift/LICENSE.txt` from the official Swift image. Archives include the executable, resource bundle, diagnostic helper, and dependency notices. Linux packaging bundles the non-glibc dependency closure and sets relative runtime search paths. The system loader and glibc stay supplied by the host. Packaging refuses to overwrite an existing archive; use a new output directory. Temporary validation directories stay available for inspection and can be removed with `trash`.
 
-Each archive contains `bin/aviary`, the adjacent SwiftPM XClient resource bundle, `libexec/aviary-selftest`, and notices under `share/doc/aviary`. Linux also includes `lib/` with the complete non-glibc dynamic dependency closure. Packaging sets relative runtime search paths on the executable, diagnostic helper, and every bundled library. The system loader and glibc remain supplied by the host OS. Swift package licenses, notices, vendored BoringSSL license headers, and Ubuntu library copyright files accompany the binaries.
-
-The four asset names are `aviary-VERSION-macos-arm64.tar.gz`, `aviary-VERSION-macos-x86_64.tar.gz`, `aviary-VERSION-linux-arm64.tar.gz`, and `aviary-VERSION-linux-x86_64.tar.gz`. `scripts/collect-checksums.py dist VERSION` verifies the individual hashes and produces `SHA256SUMS` only when all four archives exist.
-
-## Release workflow and Homebrew tap
-
-Pushing a stable `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml`. The first job rejects prerelease and invalid tags before builds or publication. It tests and packages all four platforms, validates Linux runtime-only containers on Ubuntu 22.04/24.04 and Debian 12, and uploads the artifacts and checksums to a draft GitHub release. The installer jobs test Homebrew and mise on both architectures before the release becomes public. Failed validation leaves the release as a draft. Manual packaging scripts can build prerelease archives, but this workflow publishes stable releases and updates the stable tap only.
-
-Draft browser download URLs are not public. Installer validation therefore serves the exact candidate artifacts from a local GitHub-compatible mirror, verifies mise's GitHub backend with platform autodetection, and uses a temporary Homebrew tap with the same archive hashes. An initial `0.0.0` metadata fixture points at the same artifact bytes to exercise upgrade mechanics without requiring a previous public release. The validation script isolates mise config/data and refuses to change an existing Homebrew Aviary installation. It checks install, upgrade, resource diagnostics, optional `bird` invocation, and uninstall without contacting X or reading personal browser cookies.
-
-The public `grahamannett/homebrew-tap` repository contains the generated `Formula/aviary.rb` and a short README. Before the first release it can be seeded with the macOS source bootstrap:
-
-```sh
-bash scripts/bootstrap-homebrew-tap.sh --head /tmp/homebrew-tap
-brew install --HEAD grahamannett/tap/aviary
-```
-
-Source bootstrap installation needs Xcode 16.3 or later. The production binary formula is generated only from complete, real release checksums:
-
-```sh
-bash scripts/bootstrap-homebrew-tap.sh 0.8.0 dist/SHA256SUMS /tmp/homebrew-tap
-```
-
-The bootstrap script prepares files without creating, committing, or pushing a repository. Configure the Aviary repository's `HOMEBREW_TAP_TOKEN` Actions secret with a fine-grained token granting contents write access to `grahamannett/homebrew-tap` to enable automatic updates. The default GitHub Actions token cannot write to another repository. Without the secret, the release still publishes, the workflow reports a warning, and the generated `aviary.rb` attached to the release can be committed to the tap manually.
-
-Do not edit archive checksums by hand or publish formula URLs before their release exists. A failed release workflow can be rerun while its release remains a draft; it refuses to replace an already public release.
+Run the tooling unit tests with `mise run test-release-tooling`. Check Homebrew and mise installation using their public release commands.
 
 ## Validation limits
 
-Packaging smoke checks run outside the checkout, after relocation into a path containing spaces, and verify bundled query IDs and feature switches. They exercise symlinked and renamed executables, and require the diagnostic helper to fail when the installed bundle is hidden. Linux containers run with no Swift toolchain and no network access. macOS CI runners are newer than macOS 13, so a macOS 13 machine still needs a compatibility smoke check before declaring that OS version independently verified. Linux desktop authentication needs a read-only manual account check with conventional Chrome and Firefox profiles; the offline suite covers cookie fixtures, decryption, fallback, timeout and missing-keyring behavior.
+macOS CI runners are newer than macOS 13, so that version still needs a hardware smoke check. Linux desktop authentication needs a read-only manual check with conventional Chrome and Firefox profiles; the offline suite covers cookie fixtures, decryption, fallback, timeout, and missing-keyring behavior.

@@ -1,119 +1,49 @@
-name: Build and package
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
-  workflow_call:
-    inputs:
-      version:
-        description: Release tag to check against the CLI version
-        type: string
-        default: ""
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  test:
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: macos-15
-            platform: macos
-            arch: arm64
-          - runner: macos-15-intel
-            platform: macos
-            arch: x86_64
+            container: ""
           - runner: ubuntu-22.04
-            platform: linux
-            arch: x86_64
-          - runner: ubuntu-22.04-arm
-            platform: linux
-            arch: arm64
+            container: swift:6.1.3-jammy
     runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        shell: bash
     env:
-      MACOSX_DEPLOYMENT_TARGET: "13.0"
       AVIARY_SKIP_QUERY_ID_REFRESH: "1"
     steps:
       - uses: actions/checkout@v4
-      - name: Select the Swift 6.1-compatible macOS SDK
+      - name: Use the runner's Xcode
         if: runner.os == 'macOS'
         run: echo 'DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer' >> "$GITHUB_ENV"
-      - uses: swift-actions/setup-swift@v2
-        if: runner.os != 'Linux' || matrix.arch != 'arm64'
+      - uses: actions/cache@v4
         with:
-          swift-version: "6.1.3"
-      - name: Install signed native Swift 6.1.3 for Ubuntu 22.04 ARM64
-        if: runner.os == 'Linux' && matrix.arch == 'arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            binutils ca-certificates curl git gnupg2 libc6-dev libcurl4-openssl-dev \
-            libedit2 libgcc-11-dev libpython3-dev libsqlite3-0 libstdc++-11-dev \
-            libxml2-dev libz3-dev pkg-config python3-lldb-13 tzdata unzip zlib1g-dev
-          toolchain_dir="$RUNNER_TEMP/swift-6.1.3-arm64"
-          bash scripts/install-swift-linux-arm64.sh "$toolchain_dir"
-          echo "$toolchain_dir/usr/bin" >> "$GITHUB_PATH"
-      - uses: astral-sh/setup-uv@v7
-      - name: Check release manifest and formula validation
-        run: uv run --no-project --python 3.14 python scripts/test-distribution.py
-      - name: Install Linux build and packaging dependencies
+          path: .build
+          key: swift-6.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
+          restore-keys: swift-6.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-
+      - name: Install SQLite headers
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libsqlite3-dev pkg-config patchelf
-          mkdir -p .build/release-notices
-          curl -fLsS https://raw.githubusercontent.com/swiftlang/swift/swift-6.1.3-RELEASE/LICENSE.txt -o .build/release-notices/swift-LICENSE.txt
-      - name: Run offline compatibility tests
+        run: apt-get update && apt-get install -y libsqlite3-dev
+      - name: Test
         run: swift test
-      - name: Build release executables
-        run: |
-          swift build -c release --product aviary
-          swift build -c release --product AviarySelfTest
-      - name: Package executable, resources, runtime libraries and notices
-        shell: bash
-        env:
-          EXPECTED_VERSION: ${{ inputs.version }}
-        run: |
-          build_dir="$(swift build -c release --show-bin-path)"
-          version="$("$build_dir/aviary" --version)"
-          if [[ -n "$EXPECTED_VERSION" && "$version" != "${EXPECTED_VERSION#v}" ]]; then
-            echo "CLI version $version does not match tag $EXPECTED_VERSION" >&2
-            exit 1
-          fi
-          extra_args=()
-          if [[ "${{ matrix.platform }}" == linux ]]; then
-            extra_args+=(--swift-runtime-license .build/release-notices/swift-LICENSE.txt)
-          fi
-          uv run --no-project --python 3.14 python scripts/package-release.py \
-            --build-dir "$build_dir" --output-dir dist --version "$version" \
-            --platform "${{ matrix.platform }}" --arch "${{ matrix.arch }}" "${extra_args[@]}"
-          uv run --no-project --python 3.14 python scripts/smoke-release.py \
-            "dist/aviary-$version-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz"
-      - name: Validate Ubuntu and Debian without an installed Swift runtime
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          shopt -s nullglob
-          archives=("$GITHUB_WORKSPACE"/dist/*.tar.gz)
-          if [[ ${#archives[@]} -ne 1 ]]; then
-            echo "Expected one native release archive; found ${#archives[@]}" >&2
-            exit 1
-          fi
-          archive_name="${archives[0]##*/}"
-          for image in ubuntu:22.04 ubuntu:24.04 debian:12; do
-            docker run --rm --network none \
-              -v "$GITHUB_WORKSPACE/dist:/dist:ro" \
-              -v "$GITHUB_WORKSPACE/scripts:/validation:ro" \
-              "$image" sh /validation/smoke-runtime.sh "/dist/$archive_name"
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: aviary-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            dist/*.tar.gz
-            dist/*.sha256
-          if-no-files-found: error
-          retention-days: 14
+      - uses: astral-sh/setup-uv@v7
+      - name: Test release tooling
+        run: uv run --no-project --python 3.14 python -m unittest discover -s Tests/Distribution
