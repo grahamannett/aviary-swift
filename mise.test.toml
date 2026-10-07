@@ -1,0 +1,61 @@
+# Shared environment for the check:brew_* and check:mise_* tasks in mise.toml.
+[vars]
+    root    = "{{ env.AVIARY_INSTALL_TEST_ROOT | default(value='/tmp/aviary-install-test') }}"
+    version = "{{ env.AVIARY_INSTALL_TEST_VERSION | default(value='0.1.0') }}"
+
+[env]
+    AVIARY_INSTALL_TEST_ROOT       = "{{ vars.root }}"
+    AVIARY_INSTALL_TEST_VERSION    = "{{ vars.version }}"
+    HOME                           = "{{ vars.root }}/home"
+    XDG_CONFIG_HOME                = "{{ vars.root }}/config"
+    MISE_CONFIG_DIR                = "{{ vars.root }}/config/mise"
+    MISE_DATA_DIR                  = "{{ vars.root }}/data"
+    MISE_CACHE_DIR                 = "{{ vars.root }}/cache"
+    MISE_STATE_DIR                 = "{{ vars.root }}/state"
+    MISE_GLOBAL_CONFIG_FILE        = false
+    MISE_OVERRIDE_CONFIG_FILENAMES = false
+    MISE_CONFIG_FILE               = false
+    AUTH_TOKEN                     = false
+    CT0                            = false
+    BIRD_QUERY_IDS_CACHE           = false
+    AVIARY_QUERY_IDS_CACHE         = false
+    AVIARY_FEATURES_CACHE          = false
+    BIRD_FEATURES_CACHE            = false
+    AVIARY_SKIP_QUERY_ID_REFRESH   = "1"
+    HOMEBREW_NO_AUTO_UPDATE        = "1"
+    HOMEBREW_NO_INSTALL_CLEANUP    = "1"
+
+[tasks._brew_install]
+    hide = true
+    dir  = "/tmp"
+    run  = "brew install grahamannett/tap/aviary"
+
+[tasks._brew_test]
+    hide = true
+    dir  = "/tmp"
+    run  = "brew test grahamannett/tap/aviary"
+
+[tasks._brew_uninstall]
+    hide = true
+    dir  = "/tmp"
+    run  = "brew uninstall grahamannett/tap/aviary"
+
+[tasks._brew_untap]
+    hide = true
+    dir  = "/tmp"
+    run  = "brew untap grahamannett/tap"
+
+[tasks._mise_install]
+    hide = true
+    dir  = "/tmp"
+    run  = 'mise use -g "github:grahamannett/aviary-swift@$AVIARY_INSTALL_TEST_VERSION"'
+
+[tasks._mise_bird]
+    hide = true
+    dir  = "/tmp"
+    run  = '''mise use -g --force --tool-option 'rename_exe={ aviary = "bird" }' "github:grahamannett/aviary-swift@$AVIARY_INSTALL_TEST_VERSION"'''
+
+[tasks._mise_uninstall]
+    hide = true
+    dir  = "/tmp"
+    run  = "mise uninstall --all github:grahamannett/aviary-swift"
