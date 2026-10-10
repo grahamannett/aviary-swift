@@ -1,4 +1,7 @@
 import Foundation
+#if os(macOS)
+import Darwin
+#endif
 
 enum ChromeCookies {
     static func load(
@@ -182,33 +185,107 @@ enum ChromeCookies {
     }
 
     #if os(macOS)
-    private static func readKeychain(account: String, service: String, timeoutMs: Double) -> Result<String, NSError> {
+    // Executable/arguments are an internal fixture seam; production always uses security.
+    static func readKeychain(
+        account: String,
+        service: String,
+        timeoutMs: Double,
+        executableURL: URL = URL(fileURLWithPath: "/usr/bin/security"),
+        arguments: [String]? = nil
+    ) -> Result<String, NSError> {
+        guard !Task.isCancelled else { return keychainFailure("macOS Keychain helper was cancelled.", code: NSURLErrorCancelled) }
+        let timeout = timeoutMs.isFinite && timeoutMs > 0 ? timeoutMs : 30_000
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        proc.arguments = ["find-generic-password", "-w", "-a", account, "-s", service]
-        let out = Pipe()
-        let err = Pipe()
-        proc.standardOutput = out
-        proc.standardError = err
+        proc.executableURL = executableURL
+        proc.arguments = arguments ?? ["find-generic-password", "-w", "-a", account, "-s", service]
+        let output = Pipe()
+        proc.standardInput = FileHandle.nullDevice
+        proc.standardOutput = output
+        // Helper output may contain credentials; never include it in diagnostics.
+        proc.standardError = FileHandle.nullDevice
+        defer {
+            try? output.fileHandleForReading.close()
+            try? output.fileHandleForWriting.close()
+        }
         do {
             try proc.run()
-            let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
-            while proc.isRunning, Date() < deadline {
-                Thread.sleep(forTimeInterval: 0.05)
-            }
-            if proc.isRunning {
-                proc.terminate()
-                return .failure(NSError(domain: "keychain", code: 1, userInfo: [NSLocalizedDescriptionKey: "timeout"]))
-            }
-            proc.waitUntilExit()
-            let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if proc.terminationStatus == 0 { return .success(text) }
-            let stderr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            return .failure(NSError(domain: "keychain", code: Int(proc.terminationStatus), userInfo: [NSLocalizedDescriptionKey: stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "exit \(proc.terminationStatus)" : stderr]))
         } catch {
-            return .failure(error as NSError)
+            return keychainFailure("macOS Keychain helper could not be started.", code: 1)
         }
+
+        func stopAndReap() {
+            if proc.isRunning { proc.terminate() }
+            let graceDeadline = ProcessInfo.processInfo.systemUptime + 0.25
+            while proc.isRunning, ProcessInfo.processInfo.systemUptime < graceDeadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            // Signal only this still-owned child, never a discovered PID/process group.
+            if proc.isRunning { Darwin.kill(proc.processIdentifier, SIGKILL) }
+            proc.waitUntilExit()
+        }
+
+        let descriptor = output.fileHandleForReading.fileDescriptor
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+            stopAndReap()
+            return keychainFailure("macOS Keychain helper output could not be read.", code: 2)
+        }
+        var bytes = Data()
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout / 1000
+        while proc.isRunning {
+            if Task.isCancelled {
+                stopAndReap()
+                return keychainFailure("macOS Keychain helper was cancelled.", code: NSURLErrorCancelled)
+            }
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                stopAndReap()
+                return keychainFailure("macOS Keychain helper timed out.", code: NSURLErrorTimedOut)
+            }
+            guard drainKeychainOutput(descriptor, into: &bytes) else {
+                stopAndReap()
+                return keychainFailure("macOS Keychain helper output could not be read.", code: 2)
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        proc.waitUntilExit()
+        if Task.isCancelled {
+            return keychainFailure("macOS Keychain helper was cancelled.", code: NSURLErrorCancelled)
+        }
+        // Nonblocking reads do not wait for pipe EOF from a helper's descendants.
+        guard drainKeychainOutput(descriptor, into: &bytes) else {
+            return keychainFailure("macOS Keychain helper output could not be read.", code: 2)
+        }
+        guard proc.terminationStatus == 0 else {
+            return keychainFailure("macOS Keychain helper exited with status \(proc.terminationStatus).", code: Int(proc.terminationStatus))
+        }
+        guard bytes.count < 65_536,
+              let password = normalizedEnvironmentValue(String(data: bytes, encoding: .utf8)) else {
+            return keychainFailure("macOS Keychain helper returned an invalid or empty password.", code: 3)
+        }
+        return .success(password)
+    }
+
+    private static func drainKeychainOutput(_ descriptor: Int32, into bytes: inout Data) -> Bool {
+        withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 4096) { buffer in
+            // Bound each drain so continuous output cannot bypass timeout/cancellation.
+            for _ in 0..<16 {
+                let count = Darwin.read(descriptor, buffer.baseAddress, buffer.count)
+                if count > 0 {
+                    if bytes.count < 65_536 {
+                        bytes.append(buffer.baseAddress!, count: min(count, 65_536 - bytes.count))
+                    }
+                } else if count == 0 || errno == EAGAIN || errno == EWOULDBLOCK {
+                    return true
+                } else if errno != EINTR {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    private static func keychainFailure(_ message: String, code: Int) -> Result<String, NSError> {
+        .failure(NSError(domain: "keychain", code: code, userInfo: [NSLocalizedDescriptionKey: message]))
     }
     #endif
 

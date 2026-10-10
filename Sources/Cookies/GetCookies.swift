@@ -22,6 +22,7 @@ public func getCookies(
     let nameSet = Set(names)
     let originList = origins.isEmpty ? [url] : origins
     for browser in browsers {
+        if Task.isCancelled { break }
         let result: (cookies: [Cookie], warnings: [String])
         switch browser {
         case .safari:
@@ -90,8 +91,10 @@ public func resolveTwitterCredentials(
         )
     }
     for source in sources {
+        if Task.isCancelled { break }
         let extracted = await provider(source, resolvedChrome, resolvedFirefox, timeout)
         result.warnings.append(contentsOf: extracted.warnings)
+        if Task.isCancelled { break }
         if source == .firefox, hasAmbiguousAuthContexts(extracted.cookies) {
             result.warnings.append("Found multiple Firefox account contexts; refusing to choose an account. Provide both --auth-token and --ct0 explicitly, or use a Firefox profile with only one account context.")
             continue
