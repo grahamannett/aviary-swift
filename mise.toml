@@ -57,12 +57,51 @@ arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
     run         = "swift package clean"
 
 [tasks.ci]
-    description = "Run Swift and release-tooling tests"
-    depends     = ["test", "test-release-tooling"]
+    description = "Run Swift tests, Python checks, and release-tooling tests"
+    depends     = ["test", "check-python", "test-release-tooling"]
+
+[tasks.check-python]
+    description = "Check Python lint and formatting with pinned Ruff"
+    dir = "{{config_root}}"
+    run = [
+        "uvx ruff@0.17.0 check scripts Tests/Distribution",
+        "uvx ruff@0.17.0 format --check scripts Tests/Distribution",
+    ]
+
+[tasks.format-python]
+    description = "Apply safe Python lint fixes and format release tooling and tests"
+    dir = "{{config_root}}"
+    run = [
+        "uvx ruff@0.17.0 check --fix scripts Tests/Distribution",
+        "uvx ruff@0.17.0 format scripts Tests/Distribution",
+    ]
 
 [tasks.test-release-tooling]
-    description = "Test archive metadata and license handling"
+    description = "Test release publication, archive metadata, and license handling"
     run         = "uv run --no-project --python 3.14.8 python -m unittest discover -s Tests/Distribution"
+
+[tasks.release]
+    description = "Bump, check, and publish a stable Aviary release"
+    dir = "{{config_root}}"
+    usage = """
+arg "<version>" help="Stable release version, for example 0.2.0"
+flag "--resume" help="Continue an interrupted release without replacing its tag"
+"""
+    run = '''
+set -- "$usage_version"
+if [ "$usage_resume" = "true" ]; then
+    set -- "$@" --resume
+fi
+uv run --no-project --python 3.14.8 python scripts/release.py publish "$@"
+'''
+
+[tasks.repair-tap]
+    description = "Repair the Homebrew formula from an existing public stable release"
+    dir = "{{config_root}}"
+    usage = '''
+arg "<version>" help="Published stable release version, for example 0.2.0"
+'''
+    run = 'uv run --no-project --python 3.14.8 python scripts/release.py update-tap "$usage_version"'
 
 # - All below are related to MISE_ENV=test
 [tasks."check:brew_install"]
@@ -86,7 +125,7 @@ arg "<cli_args>" var=#true help="Arguments forwarded to aviary"
     run         = "mise -E test run _mise_install"
 
 [tasks."check:mise_bird"]
-    description = "Apply the bird executable rename in the temporary mise environment"
+    description = "Configure and verify the bird command wrapper in the temporary mise environment"
     run         = "mise -E test run _mise_bird"
 
 [tasks."check:mise_uninstall"]

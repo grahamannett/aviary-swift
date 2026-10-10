@@ -55,7 +55,35 @@
 [tasks._mise_bird]
     hide = true
     dir  = "/tmp"
-    run  = '''mise use -g --force --tool-option 'rename_exe={ aviary = "bird" }' "${INSTALL_MISE_PATH}@${AVIARY_INSTALL_TEST_VERSION}"'''
+    shell = "bash -euo pipefail -c"
+    run = '''
+case "$AVIARY_INSTALL_TEST_ROOT" in
+    /*) ;;
+    *) echo 'AVIARY_INSTALL_TEST_ROOT must be an absolute path' >&2; exit 1 ;;
+esac
+mise version | uv run --no-project --python 3.14.8 python -c '
+import sys
+version = tuple(map(int, sys.stdin.read().split()[0].split(".")))
+if version < (2026, 10, 3):
+    sys.exit("The bird wrapper check requires mise 2026.10.3 or newer")
+'
+# Replacing the tool entry clears rename_exe left by the previous check.
+mise config set --global "tools.$INSTALL_MISE_PATH" "$AVIARY_INSTALL_TEST_VERSION"
+mise use -g --force "${INSTALL_MISE_PATH}@${AVIARY_INSTALL_TEST_VERSION}"
+mise config set --global wrappers.bird aviary
+mise reshim
+aviary_version="$("$MISE_DATA_DIR/shims/aviary" --version)"
+bird_version="$("$MISE_DATA_DIR/command-wrappers/bin/bird" --version)"
+[[ "$aviary_version" == "$AVIARY_INSTALL_TEST_VERSION" ]]
+[[ "$bird_version" == "$AVIARY_INSTALL_TEST_VERSION" ]]
+"$MISE_DATA_DIR/command-wrappers/bin/bird" query-ids --json | uv run --no-project --python 3.14.8 python -c '
+import json
+import sys
+diagnostics = json.load(sys.stdin)
+if not diagnostics:
+    sys.exit("Expected bundled query-ID diagnostics from the bird wrapper")
+'
+'''
 
 [tasks._mise_uninstall]
     hide = true

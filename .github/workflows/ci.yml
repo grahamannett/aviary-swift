@@ -20,8 +20,8 @@ jobs:
         include:
           - runner: macos-15
             container: ""
-          - runner: ubuntu-22.04
-            container: swift:6.1.3-jammy
+          - runner: ubuntu-24.04
+            container: swift:6.1.3-noble
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
     defaults:
@@ -37,15 +37,23 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .build
-          key: swift-6.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
-          restore-keys: swift-6.1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-
+          key: swift-6.1-${{ matrix.container || 'xcode-16.3' }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
+          restore-keys: swift-6.1-${{ matrix.container || 'xcode-16.3' }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-
       - name: Install SQLite headers
         if: runner.os == 'Linux'
-        run: apt-get update && apt-get install -y libsqlite3-dev
+        run: |
+          sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources
+          apt_options=(-o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::Retries=2)
+          apt-get "${apt_options[@]}" update
+          apt-get "${apt_options[@]}" install -y --no-install-recommends libsqlite3-dev
       - name: Test
         run: swift test
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.23"
+      - name: Check Python lint and formatting
+        run: |
+          uvx ruff@0.17.0 check scripts Tests/Distribution
+          uvx ruff@0.17.0 format --check scripts Tests/Distribution
       - name: Test release tooling
         run: uv run --no-project --python 3.14.8 python -m unittest discover -s Tests/Distribution

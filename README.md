@@ -4,7 +4,7 @@ A CLI for reading and posting on X, written in Swift. Matches Bird 0.8's command
 
 ## Install
 
-Published releases provide Apple Silicon and Intel macOS binaries, and arm64 and x86_64 Linux binaries for Ubuntu 22.04/24.04 and Debian 12. Prebuilt releases do not require a Swift compiler.
+Release packages target Apple Silicon and Intel macOS, and arm64 and x86_64 Ubuntu 24.04. Prebuilt releases do not require a Swift compiler.
 
 Install with Homebrew or mise:
 
@@ -22,10 +22,10 @@ See [distribution](docs/distribution.md) for release setup, manual downloads, su
 - macOS 13+ or a supported Linux distribution
 - On macOS: Xcode or Command Line Tools for the macOS SDK
 - On Linux: SQLite development headers and `pkg-config` (`sudo apt install libsqlite3-dev pkg-config`)
-- [mise](https://mise.jdx.dev/) for the pinned Swift 6.3.3 and uv 0.12.23 toolchains and tasks in `mise.toml`
+- [mise](https://mise.jdx.dev/) for the pinned Swift 6.3.3, Python 3.14.8, and uv 0.12.23 toolchains and tasks in `mise.toml`
 
 ```bash
-mise install swift uv
+mise install
 mise run test
 mise run build
 mise run aviary -- --help
