@@ -42,13 +42,13 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "13.0"
       AVIARY_SKIP_QUERY_ID_REFRESH: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Require a stable version tag
         run: '[[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]'
       - name: Use the runner's Xcode
         if: runner.os == 'macOS'
         run: echo 'DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer' >> "$GITHUB_ENV"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .build
           key: swift-6.1-${{ matrix.container || 'xcode-16.3' }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
@@ -67,6 +67,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.23"
+          enable-cache: false
       - name: Package and check the archive
         run: |
           build_dir="$(swift build -c release --show-bin-path)"
@@ -81,7 +82,7 @@ jobs:
             --platform "${{ matrix.platform }}" --arch "${{ matrix.arch }}" "${extra_args[@]}"
           uv run --no-project --python 3.14.8 python scripts/release.py check \
             "dist/aviary-$version-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: aviary-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -100,7 +101,7 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: aviary-linux-${{ matrix.arch }}
           path: dist
@@ -130,11 +131,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.23"
-      - uses: actions/download-artifact@v4
+          enable-cache: false
+      - uses: actions/download-artifact@v8
         with:
           pattern: aviary-*
           path: dist
@@ -156,13 +158,14 @@ jobs:
       RELEASE_TAG: ${{ github.ref_name }}
       HAS_HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.23"
+          enable-cache: false
       - name: Test release tooling
         run: uv run --no-project --python 3.14.8 python -m unittest discover -s Tests/Distribution
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: env.HAS_HOMEBREW_TAP_TOKEN == 'true'
         with:
           repository: grahamannett/homebrew-tap

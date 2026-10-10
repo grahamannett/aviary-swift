@@ -30,11 +30,11 @@ jobs:
     env:
       AVIARY_SKIP_QUERY_ID_REFRESH: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use the runner's Xcode
         if: runner.os == 'macOS'
         run: echo 'DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer' >> "$GITHUB_ENV"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .build
           key: swift-6.1-${{ matrix.container || 'xcode-16.3' }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ github.sha }}
@@ -51,6 +51,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.12.23"
+          enable-cache: false
       - name: Check Python lint and formatting
         run: |
           uvx ruff@0.17.0 check scripts Tests/Distribution
