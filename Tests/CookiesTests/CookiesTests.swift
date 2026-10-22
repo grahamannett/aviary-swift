@@ -61,6 +61,31 @@ final class CookiesTests: XCTestCase {
         XCTAssertTrue(calls.isEmpty)
     }
 
+    func testCancellationStopsBrowserFallbackAndRejectsCancelledProviderCredentials() async {
+        let recorder = CookieRecorder([
+            .chrome: [Cookie(name: "auth_token", value: "cancelled-auth", domain: "x.com"),
+                      Cookie(name: "ct0", value: "cancelled-csrf", domain: "x.com")],
+            .firefox: [Cookie(name: "auth_token", value: "other-account", domain: "x.com"),
+                       Cookie(name: "ct0", value: "other-csrf", domain: "x.com")],
+        ])
+        let task = Task.detached {
+            await resolveTwitterCredentials(
+                authToken: nil, ct0: nil, cookieSource: [.chrome, .firefox],
+                chromeProfile: nil, firefoxProfile: nil, cookieTimeoutMs: nil,
+                environment: [:], cookieProvider: { browser, chrome, firefox, timeout in
+                    let result = await recorder.read(browser, chrome, firefox, timeout)
+                    withUnsafeCurrentTask { $0?.cancel() }
+                    return result
+                }
+            )
+        }
+        let result = await task.value
+        XCTAssertFalse(result.isComplete)
+        XCTAssertNil(result.cookieHeader)
+        let calls = await recorder.calls
+        XCTAssertEqual(calls, [.chrome])
+    }
+
     func testDefaultBrowserOrderSkipsEmptyAndIncompletePairs() async {
         let recorder = CookieRecorder([
             .safari: [Cookie(name: "auth_token", value: "", domain: "x.com"), Cookie(name: "ct0", value: "empty-auth-csrf", domain: "x.com")],

@@ -36,6 +36,8 @@ An authenticated invocation resolves configuration and environment once, then us
 
 Chrome and Firefox databases are acquired through SQLite's backup API rather than independent database/WAL/SHM copies. Snapshots include committed WAL state, exclude uncommitted writes, and are converted to standalone rollback-journal databases before read-only extraction. Backup stepping and lock waits have a two-second deadline; unreadable, corrupt, or persistently busy databases produce extraction warnings instead of silently ignoring sidecar failures.
 
+macOS Keychain helpers use bounded, nonblocking password reads and a monotonic timeout. Timeout or task cancellation terminates the owned helper, escalates to SIGKILL if needed, and waits for it to be reaped before returning. Helper stdout/stderr never appear in failure diagnostics; cancellation stops browser fallback rather than selecting another account. Offline regressions use isolated subprocess fixtures, not the user's Keychain.
+
 Aviary reads legacy query-ID/feature caches as fallbacks, but default writes go to `$XDG_CONFIG_HOME/aviary` or `~/.config/aviary`. `AVIARY_QUERY_IDS_CACHE`, `AVIARY_FEATURES_CACHE`/`AVIARY_FEATURES_PATH`, and `AVIARY_FEATURES_JSON` provide Aviary-specific overrides. Legacy `BIRD_QUERY_IDS_CACHE`, `BIRD_FEATURES_CACHE`/`BIRD_FEATURES_PATH`, and `BIRD_FEATURES_JSON` remain supported as read-only inputs or invocation-only feature overrides. Cache refresh does not persist environment feature overrides.
 
 Query-ID discovery pairs operation names and IDs within the same JavaScript object, not across adjacent operations. Feature inheritance uses one override snapshot per resolution, preserving global and per-set precedence without rereading caches for every parent set.
