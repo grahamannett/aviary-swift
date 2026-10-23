@@ -6,7 +6,7 @@ public struct AviaryRoot: AsyncParsableCommand {
         commandName: "aviary",
         abstract: "Post tweets and replies via Twitter/X GraphQL API",
         discussion: "fast X CLI for tweeting, replying, and reading",
-        version: "0.1.2",
+        version: "0.2.0",
         subcommands: [
             Tweet.self, Reply.self, HelpCmd.self, QueryIds.self, Home.self, Read.self, Replies.self,
             Thread.self,
